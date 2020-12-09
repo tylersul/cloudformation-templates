@@ -5,3 +5,10 @@ Resources:
         Type: AWS::S3::Bucket
         Properties:
             BucketName: tyler-cf-bucket # use your own unique name
+            AccessControl: PublicRead
+            WebsiteConfiguration:
+                IndexDocument: index.html
+Outputs:
+    WebsiteURL:
+        Value: !GetAtt [Bucket, WebsiteURL]
+        Description: URL for website hosted on S3
