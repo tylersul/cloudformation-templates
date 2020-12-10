@@ -1,0 +1,49 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: A simple CloudFormation template
+Resources:
+    VPC:
+        Type: AWS::EC2::VPC
+        Properties:
+            CidrBlock: 172.34.0.0/16                                  # Required
+            EnableDnsHostnames: False
+            Tags:
+              - Key: "Name"
+                Value: "Tyler-CF-VPC"
+    Bucket:
+        Type: AWS::S3::Bucket
+        Properties:
+            BucketName: tyler-cf-bucket 
+            AccessControl: PublicRead
+    WebServer1:
+        Type: AWS::EC2::Instance
+        Properties:
+            ImageId: ami-04d29b6f966df1537
+            InstanceType: t2.micro                                    # Default is m1.small
+            SecurityGroups: 
+              - Ref: ServerSecurityGroup
+            Tags:
+              - Key: "Name"
+                Value: "Tyler-Cloudformation"
+    WebServer2:
+        Type: AWS::EC2::Instance
+        Properties:
+            ImageId: ami-04d29b6f966df1537
+            InstanceType: t2.micro                                    # Default is m1.small
+            SecurityGroups: 
+              - Ref: ServerSecurityGroup
+            Tags:
+              - Key: "Name"
+                Value: "Tyler-Cloudformation"
+    ServerSecurityGroup:
+        Type: AWS::EC2::SecurityGroup
+        Properties:
+          GroupDescription: Example server SG using CloudFormation.
+          SecurityGroupIngress:
+            - CidrIp: 104.153.231.113/32
+              FromPort: '80'
+              IpProtocol: tcp
+              ToPort: '80' 
+# Outputs:
+#     WebsiteURL:
+#         Value: !GetAtt [Bucket, BucketName]
+#         Description: URL for website hosted on S3
