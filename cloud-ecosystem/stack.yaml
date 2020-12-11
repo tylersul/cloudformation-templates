@@ -49,15 +49,34 @@ Resources:
         Tags:
           - Key: "Name"
             Value: "Tyler-CF-Subnet2"
-    # NATGateway:
-    #   Type: AWS::EC2::NatGateway
-    #   Properties:
-    #     AllocationId: !GetAtt ElasticIPAddress.AllocationId
-    #     SubnetId: !Ref Subnet1
-    # ElasticIPAddress:
-    #   Type: AWS::EC2::EIP
-    #   Properties:
-    #     Domain: VPC
+    PublicRouteTable:
+      Type: AWS::EC2::RouteTable
+      Properties:
+        VpcId: !Ref VPC
+        Tags:
+        - Key: Name
+          Value: Public
+    PublicRoute1:   # Public route table has direct routing to IGW:
+      Type: AWS::EC2::Route
+      DependsOn: AttachGateway
+      Properties:
+        RouteTableId: !Ref PublicRouteTable
+        DestinationCidrBlock: 0.0.0.0/0
+        GatewayId: !Ref InternetGateway  
+    PublicSubnetARouteTableAssociation:
+      Type: AWS::EC2::SubnetRouteTableAssociation
+      Properties:
+        SubnetId: !Ref Subnet1
+        RouteTableId: !Ref PublicRouteTable
+    NATGateway:
+      Type: AWS::EC2::NatGateway
+      Properties:
+        AllocationId: !GetAtt ElasticIPAddress.AllocationId
+        SubnetId: !Ref Subnet1
+    ElasticIPAddress:
+      Type: AWS::EC2::EIP
+      Properties:
+        Domain: VPC
     Bucket:
       Type: AWS::S3::Bucket
       Properties:
@@ -68,33 +87,39 @@ Resources:
       Properties:
         ImageId: !FindInMap [RegionMap, !Ref "AWS::Region", AMI]
         InstanceType: t2.micro                                    # Default is m1.small
-        # SubnetId:
-        #   Ref: Subnet1
-        SecurityGroups: 
-          - Ref: ServerSecurityGroup
+        SubnetId:
+          Ref: Subnet1
+        SecurityGroupIds: 
+          - !GetAtt ServerSecurityGroup.GroupId
         Tags:
           - Key: "Name"
-            Value: "Tyler-Cloudformation"
+            Value: "Tyler-CF-WebServer1"
     WebServer2:
       Type: AWS::EC2::Instance
       Properties:
         ImageId: !FindInMap [RegionMap, !Ref "AWS::Region", AMI]
         InstanceType: t2.micro                                    # Default is m1.small
-        SecurityGroups: 
-          - Ref: ServerSecurityGroup
+        SubnetId:
+          Ref: Subnet2
+        SecurityGroupIds: 
+          - !GetAtt ServerSecurityGroup.GroupId
         Tags:
           - Key: "Name"
-            Value: "Tyler-Cloudformation"
+            Value: "Tyler-CF-WebServer2"
     ServerSecurityGroup:
       Type: AWS::EC2::SecurityGroup
       Properties:
         GroupDescription: Example server SG using CloudFormation.
+        VpcId: !Ref VPC
         SecurityGroupIngress:
           - CidrIp: 104.153.231.113/32
             FromPort: '80'
             IpProtocol: tcp
             ToPort: '80' 
-# Outputs:
-#     WebsiteURL:
-#         Value: !GetAtt [Bucket, BucketName]
-#         Description: URL for website hosted on S3
+        Tags:
+          - Key: "Name"
+            Value: "Tyler-CF-SG"
+Outputs:
+    SecurityGroupId:
+        Value: !GetAtt [ServerSecurityGroup, GroupId]
+        Description: Security Group Id
