@@ -1,4 +1,5 @@
 AWSTemplateFormatVersion: '2010-09-09'
+# Input at runtime with the parameter flag and ParameterKey=SNSEmail,ParameterValue=<your-value>
 Parameters:
   SNSEmail:
     Type: String

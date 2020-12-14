@@ -4,16 +4,17 @@ Parameters:
   EmailAddress:
     Type: String
     Description: 'Enter email for SNS notification'
+    Default: test@test.com
 Resources: 
   NestedS3Call: 
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: https://baxter-poc-jg.s3.amazonaws.com/s3.yaml
+      TemplateURL: https://tyler-cf.s3.amazonaws.com/s3.yaml
       TimeoutInMinutes: 10
   NestedSnsCall:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: https://baxter-poc-jg.s3.amazonaws.com/sns-email.yaml
+      TemplateURL: https://tyler-cf.s3.amazonaws.com/sns-email.yaml
       TimeoutInMinutes: 10
       Parameters:
         SNSEmail: !Ref EmailAddress
