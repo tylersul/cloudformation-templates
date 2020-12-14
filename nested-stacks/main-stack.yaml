@@ -1,0 +1,26 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Main Stack
+Parameters:
+  EmailAddress:
+    Type: String
+    Description: 'Enter email for SNS notification'
+Resources: 
+  NestedS3Call: 
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: https://baxter-poc-jg.s3.amazonaws.com/s3.yaml
+      TimeoutInMinutes: 10
+  NestedSnsCall:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: https://baxter-poc-jg.s3.amazonaws.com/sns-email.yaml
+      TimeoutInMinutes: 10
+      Parameters:
+        SNSEmail: !Ref EmailAddress
+Outputs:
+  S3StackRef:
+    Value: !Ref NestedS3Call
+  OutputFromNestedS3Stack:
+    Value: !GetAtt NestedS3Call.Outputs.BucketName
+  SnsStackRef:
+    Value: !Ref NestedSnsCall

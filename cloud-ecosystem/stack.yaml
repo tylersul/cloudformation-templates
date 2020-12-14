@@ -1,5 +1,10 @@
-AWSTemplateFormatVersion: 2010-09-09
+AWSTemplateFormatVersion: '2010-09-09'
 Description: A simple CloudFormation template
+Parameters:
+  VpcCIDR:
+    Description: Please enter the IP range (CIDR notation) for this VPC
+    Type: String
+    Default: 172.34.0.0/16
 Mappings: 
   RegionMap: 
     us-east-1: 
@@ -10,7 +15,7 @@ Resources:
     VPC:
       Type: AWS::EC2::VPC
       Properties:
-          CidrBlock: 172.34.0.0/16                                  # Required
+          CidrBlock: !Ref VpcCIDR
           EnableDnsHostnames: False
           Tags:
             - Key: "Name"
@@ -27,7 +32,7 @@ Resources:
       Properties:
         VpcId: !Ref VPC
         InternetGatewayId: !Ref InternetGateway
-    Subnet1:
+    PrivateSubnet1:
       Type: AWS::EC2::Subnet
       Properties:
         AvailabilityZone: us-west-1a
@@ -37,8 +42,8 @@ Resources:
         MapPublicIpOnLaunch: False
         Tags:
           - Key: "Name"
-            Value: "Tyler-CF-Subnet1"
-    Subnet2:
+            Value: "Tyler-CF-PrivateSubnet1"
+    PrivateSubnet2:
       Type: AWS::EC2::Subnet
       Properties:
         AvailabilityZone: us-west-1c
@@ -48,7 +53,29 @@ Resources:
         MapPublicIpOnLaunch: False
         Tags:
           - Key: "Name"
-            Value: "Tyler-CF-Subnet2"
+            Value: "Tyler-CF-PrivateSubnet2"
+    PublicSubnet1:
+      Type: AWS::EC2::Subnet
+      Properties:
+        AvailabilityZone: us-west-1a
+        CidrBlock: 172.34.2.0/24
+        VpcId: 
+          Ref: VPC
+        MapPublicIpOnLaunch: False
+        Tags:
+          - Key: "Name"
+            Value: "Tyler-CF-PublicSubnet1"
+    PublicSubnet2:
+      Type: AWS::EC2::Subnet
+      Properties:
+        AvailabilityZone: us-west-1c
+        CidrBlock: 172.34.3.0/24
+        VpcId: 
+          Ref: VPC
+        MapPublicIpOnLaunch: False
+        Tags:
+          - Key: "Name"
+            Value: "Tyler-CF-PublicSubnet2"
     PublicRouteTable:
       Type: AWS::EC2::RouteTable
       Properties:
@@ -66,13 +93,13 @@ Resources:
     PublicSubnetARouteTableAssociation:
       Type: AWS::EC2::SubnetRouteTableAssociation
       Properties:
-        SubnetId: !Ref Subnet1
+        SubnetId: !Ref PublicSubnet1
         RouteTableId: !Ref PublicRouteTable
     NATGateway:
       Type: AWS::EC2::NatGateway
       Properties:
         AllocationId: !GetAtt ElasticIPAddress.AllocationId
-        SubnetId: !Ref Subnet1
+        SubnetId: !Ref PublicSubnet1
     ElasticIPAddress:
       Type: AWS::EC2::EIP
       Properties:
@@ -88,7 +115,7 @@ Resources:
         ImageId: !FindInMap [RegionMap, !Ref "AWS::Region", AMI]
         InstanceType: t2.micro                                    # Default is m1.small
         SubnetId:
-          Ref: Subnet1
+          Ref: PrivateSubnet1
         SecurityGroupIds: 
           - !GetAtt ServerSecurityGroup.GroupId
         Tags:
@@ -100,7 +127,7 @@ Resources:
         ImageId: !FindInMap [RegionMap, !Ref "AWS::Region", AMI]
         InstanceType: t2.micro                                    # Default is m1.small
         SubnetId:
-          Ref: Subnet2
+          Ref: PrivateSubnet2
         SecurityGroupIds: 
           - !GetAtt ServerSecurityGroup.GroupId
         Tags:
@@ -119,7 +146,39 @@ Resources:
         Tags:
           - Key: "Name"
             Value: "Tyler-CF-SG"
+    WebServerLoadBalancer:
+      Properties:
+        CrossZone: true
+        Listeners:
+        - InstancePort: '80'
+          InstanceProtocol: HTTP
+          LoadBalancerPort: '80'
+          Protocol: HTTP
+        HealthCheck:
+          Target: HTTP:80/
+          HealthyThreshold: '2'
+          UnhealthyThreshold: '3'
+          Interval: '10'
+          Timeout: '5'
+
+
+    # WebServerAutoScalingGroup:
+    #   Type: AWS::AutoScaling::AutoScalingGroup
+    #   Properties:
+    #     Name: Tyler-CF-AS-Group
+    #     MaxSize: 3
+    #     MinSize: 1
+
 Outputs:
+    VPC: 
+      Description: VPC created from this CF stack.
+      Value: !Ref VPC
+    PublicSubnets:
+      Description: A list of the public subnets from this CF stack.
+      Value: !Join [ ", ", [ !Ref PublicSubnet1, !Ref PublicSubnet2 ]]
+    PrivateSubnets:
+      Description: A list of the private subnets from this CF stack.
+      Value: !Join [ ", ", [ !Ref PrivateSubnet1, !Ref PrivateSubnet2 ]]
     SecurityGroupId:
-        Value: !GetAtt [ServerSecurityGroup, GroupId]
-        Description: Security Group Id
+      Value: !GetAtt [ServerSecurityGroup, GroupId]
+      Description: Security Group Id
