@@ -5,6 +5,22 @@ Parameters:
     Description: Please enter the IP range (CIDR notation) for this VPC
     Type: String
     Default: 172.34.0.0/16
+  PublicSubnet1CIDR:
+    Description: Please enter the IP range (CIDR notation) for the public subnet in the first Availability Zone
+    Type: String
+    Default: 172.34.2.0/24
+  PublicSubnet2CIDR:
+    Description: Please enter the IP range (CIDR notation) for the public subnet in the second Availability Zone
+    Type: String
+    Default: 172.34.3.0/24
+  PrivateSubnet1CIDR:
+    Description: Please enter the IP range (CIDR notation) for the private subnet in the first Availability Zone
+    Type: String
+    Default: 172.34.0.0/24
+  PrivateSubnet2CIDR:
+    Description: Please enter the IP range (CIDR notation) for the private subnet in the second Availability Zone
+    Type: String
+    Default: 172.34.1.0/24
 Mappings: 
   RegionMap: 
     us-east-1: 
@@ -146,20 +162,20 @@ Resources:
         Tags:
           - Key: "Name"
             Value: "Tyler-CF-SG"
-    WebServerLoadBalancer:
-      Properties:
-        CrossZone: true
-        Listeners:
-        - InstancePort: '80'
-          InstanceProtocol: HTTP
-          LoadBalancerPort: '80'
-          Protocol: HTTP
-        HealthCheck:
-          Target: HTTP:80/
-          HealthyThreshold: '2'
-          UnhealthyThreshold: '3'
-          Interval: '10'
-          Timeout: '5'
+    # WebServerLoadBalancer:
+    #   Properties:
+    #     CrossZone: true
+    #     Listeners:
+    #     - InstancePort: '80'
+    #       InstanceProtocol: HTTP
+    #       LoadBalancerPort: '80'
+    #       Protocol: HTTP
+    #     HealthCheck:
+    #       Target: HTTP:80/
+    #       HealthyThreshold: '2'
+    #       UnhealthyThreshold: '3'
+    #       Interval: '10'
+    #       Timeout: '5'
 
 
     # WebServerAutoScalingGroup:
