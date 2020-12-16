@@ -120,6 +120,9 @@ Resources:
       Type: AWS::EC2::EIP
       Properties:
         Domain: vpc
+        Tags:
+          - Key: "Name"
+            Value: "Tyler-CF-EIP"
     Bucket:
       Type: AWS::S3::Bucket
       Properties:
@@ -131,7 +134,7 @@ Resources:
         ImageId: !FindInMap [RegionMap, !Ref "AWS::Region", AMI]
         InstanceType: t2.micro                                    # Default is m1.small
         SubnetId:
-          Ref: PrivateSubnet1
+          Ref: PublicSubnet1
         SecurityGroupIds: 
           - !GetAtt ServerSecurityGroup.GroupId
         Tags:
@@ -143,12 +146,48 @@ Resources:
         ImageId: !FindInMap [RegionMap, !Ref "AWS::Region", AMI]
         InstanceType: t2.micro                                    # Default is m1.small
         SubnetId:
-          Ref: PrivateSubnet2
+          Ref: PublicSubnet2
         SecurityGroupIds: 
           - !GetAtt ServerSecurityGroup.GroupId
         Tags:
           - Key: "Name"
             Value: "Tyler-CF-WebServer2"
+    DBServer1:
+      Type: AWS::EC2::Instance
+      Properties:
+        ImageId: !FindInMap [RegionMap, !Ref "AWS::Region", AMI]
+        InstanceType: t2.micro                                    # Default is m1.small
+        SubnetId:
+          Ref: PrivateSubnet1
+        SecurityGroupIds: 
+          - !GetAtt ServerSecurityGroup.GroupId
+        Tags:
+          - Key: "Name"
+            Value: "Tyler-CF-DBServer1"
+    DBServer2:
+      Type: AWS::EC2::Instance
+      Properties:
+        ImageId: !FindInMap [RegionMap, !Ref "AWS::Region", AMI]
+        InstanceType: t2.micro                                    # Default is m1.small
+        SubnetId:
+          Ref: PrivateSubnet2
+        SecurityGroupIds: 
+          - !GetAtt ServerSecurityGroup.GroupId
+        Tags:
+          - Key: "Name"
+            Value: "Tyler-CF-DBServer2"
+    BastionHost:
+      Type: AWS::EC2::Instance
+      Properties:
+        ImageId: !FindInMap [RegionMap, !Ref "AWS::Region", AMI]
+        InstanceType: t2.micro                                    # Default is m1.small
+        SubnetId:
+          Ref: PublicSubnet1
+        SecurityGroupIds: 
+          - !GetAtt ServerSecurityGroup.GroupId
+        Tags:
+          - Key: "Name"
+            Value: "Tyler-CF-BastionHost"
     ServerSecurityGroup:
       Type: AWS::EC2::SecurityGroup
       Properties:
