@@ -32,229 +32,282 @@ Mappings:
     us-west-1: 
       AMI: "ami-08d9a394ac1c2994c"
 Resources:
-    VPC:
-      Type: AWS::EC2::VPC
-      Properties:
-          CidrBlock: !Ref VpcCIDR
-          EnableDnsHostnames: False
-          Tags:
-            - Key: "Name"
-              Value: "Tyler-CF-VPC"
-    InternetGateway:
-      Type: AWS::EC2::InternetGateway
-      Properties:
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+        CidrBlock: !Ref VpcCIDR
+        EnableDnsHostnames: False
         Tags:
           - Key: "Name"
-            Value: "Tyler-CF-IGW"
-      DependsOn: VPC
-    AttachGateway:
-      Type: AWS::EC2::VPCGatewayAttachment
-      Properties:
-        VpcId: !Ref VPC
-        InternetGatewayId: !Ref InternetGateway
-    PrivateSubnet1:
-      Type: AWS::EC2::Subnet
-      Properties:
-        AvailabilityZone: !Select [0, !GetAZs '' ] # First AZ in deployment region
-        CidrBlock: !Ref PrivateSubnet1CIDR
-        VpcId: 
-          Ref: VPC
-        MapPublicIpOnLaunch: False
-        Tags:
-          - Key: "Name"
-            Value: "Tyler-CF-PrivateSubnet1"
-    PrivateSubnet2:
-      Type: AWS::EC2::Subnet
-      Properties:
-        AvailabilityZone: !Select [1, !GetAZs '' ] # Second AZ in deployment region
-        CidrBlock: !Ref PrivateSubnet2CIDR
-        VpcId: 
-          Ref: VPC
-        MapPublicIpOnLaunch: False
-        Tags:
-          - Key: "Name"
-            Value: "Tyler-CF-PrivateSubnet2"
-    PublicSubnet1:
-      Type: AWS::EC2::Subnet
-      Properties:
-        AvailabilityZone: !Select [0, !GetAZs '' ] # First AZ in deployment region
-        CidrBlock: !Ref PublicSubnet1CIDR
-        VpcId: 
-          Ref: VPC
-        MapPublicIpOnLaunch: False
-        Tags:
-          - Key: "Name"
-            Value: "Tyler-CF-PublicSubnet1"
-    PublicSubnet2:
-      Type: AWS::EC2::Subnet
-      Properties:
-        AvailabilityZone: !Select [1, !GetAZs '' ] # Second AZ in deployment region
-        CidrBlock: !Ref PublicSubnet2CIDR
-        VpcId: 
-          Ref: VPC
-        MapPublicIpOnLaunch: False
-        Tags:
-          - Key: "Name"
-            Value: "Tyler-CF-PublicSubnet2"
-    PublicRouteTable:
-      Type: AWS::EC2::RouteTable
-      Properties:
-        VpcId: !Ref VPC
-        Tags:
-        - Key: Name
-          Value: "Tyler-CF-Public-RT"
-    PublicRoute1:   # Public route table has direct routing to IGW:
-      Type: AWS::EC2::Route
-      DependsOn: AttachGateway
-      Properties:
-        RouteTableId: !Ref PublicRouteTable
-        DestinationCidrBlock: 0.0.0.0/0
-        GatewayId: !Ref InternetGateway  
-    PublicSubnetRouteTableAssociation:
-      Type: AWS::EC2::SubnetRouteTableAssociation
-      Properties:
-        SubnetId: !Ref PublicSubnet1
-        RouteTableId: !Ref PublicRouteTable
-    PrivateRouteTable:
-      Type: AWS::EC2::RouteTable
-      Properties:
-        VpcId: !Ref VPC
-        Tags:
-        - Key: Name
-          Value: "Tyler-CF-Private-RT"
-    PrivateRoute1:   # Private route table has direct routing to bastion
-      Type: AWS::EC2::Route
-      DependsOn: AttachGateway
-      Properties:
-        RouteTableId: !Ref PrivateRouteTable
-        DestinationCidrBlock: 0.0.0.0/0
-        GatewayId: !Ref BastionHost
-    PrivateSubnetRouteTableAssociation:
-      Type: AWS::EC2::SubnetRouteTableAssociation
-      Properties:
-        SubnetId: !Ref PrivateSubnet1
-        RouteTableId: !Ref PrivateRouteTable
-    NATGateway:
-      Type: AWS::EC2::NatGateway
-      Properties:
-        AllocationId: !GetAtt ElasticIPAddress.AllocationId
-        SubnetId: !Ref PublicSubnet1
-        Tags:
-          - Key: "Name"
-            Value: "Tyler-CF-Nat-Gateway"
-    ElasticIPAddress:
-      Type: AWS::EC2::EIP
-      Properties:
-        Domain: vpc
-        Tags:
-          - Key: "Name"
-            Value: "Tyler-CF-EIP"
-    Bucket:
-      Type: AWS::S3::Bucket
-      Properties:
-        BucketName: tyler-cf-bucket 
-        AccessControl: PublicRead
-    WebServer1:
-      Type: AWS::EC2::Instance
-      Properties:
-        ImageId: !FindInMap [RegionMap, !Ref "AWS::Region", AMI]
-        InstanceType: t2.micro                                    # Default is m1.small
-        SubnetId:
-          Ref: PublicSubnet1
-        SecurityGroupIds: 
-          - !GetAtt PrivateServerSecurityGroup.GroupId
-        Tags:
-          - Key: "Name"
-            Value: "Tyler-CF-WebServer1"
-    WebServer2:
-      Type: AWS::EC2::Instance
-      Properties:
-        ImageId: !FindInMap [RegionMap, !Ref "AWS::Region", AMI]
-        InstanceType: t2.micro                                    # Default is m1.small
-        SubnetId:
-          Ref: PublicSubnet2
-        SecurityGroupIds: 
-          - !GetAtt PrivateServerSecurityGroup.GroupId
-        Tags:
-          - Key: "Name"
-            Value: "Tyler-CF-WebServer2"
-    DBServer1:
-      Type: AWS::EC2::Instance
-      Properties:
-        ImageId: !FindInMap [RegionMap, !Ref "AWS::Region", AMI]
-        InstanceType: t2.micro                                    # Default is m1.small
-        SubnetId:
-          Ref: PrivateSubnet1
-        SecurityGroupIds: 
-          - !GetAtt PrivateServerSecurityGroup.GroupId
-        Tags:
-          - Key: "Name"
-            Value: "Tyler-CF-DBServer1"
-    DBServer2:
-      Type: AWS::EC2::Instance
-      Properties:
-        ImageId: !FindInMap [RegionMap, !Ref "AWS::Region", AMI]
-        InstanceType: t2.micro                                    # Default is m1.small
-        SubnetId:
-          Ref: PrivateSubnet2
-        SecurityGroupIds: 
-          - !GetAtt PrivateServerSecurityGroup.GroupId
-        Tags:
-          - Key: "Name"
-            Value: "Tyler-CF-DBServer2"
-    BastionHost:
-      Type: AWS::EC2::Instance
-      Properties:
-        ImageId: !FindInMap [RegionMap, !Ref "AWS::Region", AMI]
-        InstanceType: t2.micro                                    # Default is m1.small
-        NetworkInterfaces:
-          - AssociatePublicIpAddress: true
-            DeviceIndex: "0"
-            SubnetId:
-              Ref: PublicSubnet1
-            GroupSet:
-              - Ref: BastionServerSecurityGroup
-        KeyName: !Ref KeyName
-        Tags:
-          - Key: "Name"
-            Value: "Tyler-CF-BastionHost"
-    BastionServerSecurityGroup:
-      Type: AWS::EC2::SecurityGroup
-      Properties:
-        GroupDescription: SG for bastion host server.
-        VpcId: !Ref VPC
-        SecurityGroupIngress:
-          - CidrIp: 104.153.231.113/32
-            FromPort: 22
-            IpProtocol: tcp
-            ToPort: 22
-        Tags:
-          - Key: "Name"
-            Value: "Tyler-CF-SG-BastionHost"
-    PrivateServerSecurityGroup:
-      Type: AWS::EC2::SecurityGroup
-      Properties:
-        GroupDescription: SG for DB servers.
-        VpcId: !Ref VPC
-        SecurityGroupIngress:
-          - CidrIp: 3.101.130.253/32
-            FromPort: 22
-            IpProtocol: tcp
-            ToPort: 22
-    # WebServerLoadBalancer:
-    #   Properties:
-    #     CrossZone: true
-    #     Listeners:
-    #     - InstancePort: '80'
-    #       InstanceProtocol: HTTP
-    #       LoadBalancerPort: '80'
-    #       Protocol: HTTP
-    #     HealthCheck:
-    #       Target: HTTP:80/
-    #       HealthyThreshold: '2'
-    #       UnhealthyThreshold: '3'
-    #       Interval: '10'
-    #       Timeout: '5'
+            Value: "Tyler-CF-VPC"
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: "Name"
+          Value: "Tyler-CF-IGW"
+    DependsOn: VPC
+  AttachGateway:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref VPC
+      InternetGatewayId: !Ref InternetGateway
+  PrivateSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Select [0, !GetAZs '' ] # First AZ in deployment region
+      CidrBlock: !Ref PrivateSubnet1CIDR
+      VpcId: 
+        Ref: VPC
+      MapPublicIpOnLaunch: False
+      Tags:
+        - Key: "Name"
+          Value: "Tyler-CF-PrivateSubnet1"
+  PrivateSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Select [1, !GetAZs '' ] # Second AZ in deployment region
+      CidrBlock: !Ref PrivateSubnet2CIDR
+      VpcId: 
+        Ref: VPC
+      MapPublicIpOnLaunch: False
+      Tags:
+        - Key: "Name"
+          Value: "Tyler-CF-PrivateSubnet2"
+  PublicSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Select [0, !GetAZs '' ] # First AZ in deployment region
+      CidrBlock: !Ref PublicSubnet1CIDR
+      VpcId: 
+        Ref: VPC
+      MapPublicIpOnLaunch: False
+      Tags:
+        - Key: "Name"
+          Value: "Tyler-CF-PublicSubnet1"
+  PublicSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Select [1, !GetAZs '' ] # Second AZ in deployment region
+      CidrBlock: !Ref PublicSubnet2CIDR
+      VpcId: 
+        Ref: VPC
+      MapPublicIpOnLaunch: False
+      Tags:
+        - Key: "Name"
+          Value: "Tyler-CF-PublicSubnet2"
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+      - Key: Name
+        Value: "Tyler-CF-Public-RT"
+  PublicRoute1:   # Public route table has direct routing to IGW:
+    Type: AWS::EC2::Route
+    DependsOn: AttachGateway
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway  
+  PublicSubnetRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnet1
+      RouteTableId: !Ref PublicRouteTable
+  PrivateRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+      - Key: Name
+        Value: "Tyler-CF-Private-RT"
+  PrivateRoute1:   # Private route table has direct routing to bastion
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NATGateway
+  PrivateSubnetRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PrivateSubnet1
+      RouteTableId: !Ref PrivateRouteTable
+  NATGateway:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId: !GetAtt ElasticIPAddress.AllocationId
+      SubnetId: !Ref PublicSubnet1
+      Tags:
+        - Key: "Name"
+          Value: "Tyler-CF-Nat-Gateway"
+  ElasticIPAddress:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: vpc
+      Tags:
+        - Key: "Name"
+          Value: "Tyler-CF-EIP"
+  Bucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: tyler-cf-bucket 
+      AccessControl: PublicRead
+  WebServer1:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: !FindInMap [RegionMap, !Ref "AWS::Region", AMI]
+      InstanceType: t2.micro                                    # Default is m1.small
+      SubnetId:
+        Ref: PublicSubnet1
+      SecurityGroupIds: 
+        - !GetAtt PrivateServerSecurityGroup.GroupId
+      Tags:
+        - Key: "Name"
+          Value: "Tyler-CF-WebServer1"
+  WebServer2:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: !FindInMap [RegionMap, !Ref "AWS::Region", AMI]
+      InstanceType: t2.micro                                    # Default is m1.small
+      SubnetId:
+        Ref: PublicSubnet2
+      SecurityGroupIds: 
+        - !GetAtt PrivateServerSecurityGroup.GroupId
+      Tags:
+        - Key: "Name"
+          Value: "Tyler-CF-WebServer2"
+  DBServer1:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: !FindInMap [RegionMap, !Ref "AWS::Region", AMI]
+      InstanceType: t2.micro                                    # Default is m1.small
+      SubnetId:
+        Ref: PrivateSubnet1
+      SecurityGroupIds: 
+        - !GetAtt PrivateServerSecurityGroup.GroupId
+      Tags:
+        - Key: "Name"
+          Value: "Tyler-CF-DBServer1"
+  DBServer2:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: !FindInMap [RegionMap, !Ref "AWS::Region", AMI]
+      InstanceType: t2.micro                                    # Default is m1.small
+      SubnetId:
+        Ref: PrivateSubnet2
+      SecurityGroupIds: 
+        - !GetAtt PrivateServerSecurityGroup.GroupId
+      Tags:
+        - Key: "Name"
+          Value: "Tyler-CF-DBServer2"
+  BastionHost:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: !FindInMap [RegionMap, !Ref "AWS::Region", AMI]
+      InstanceType: t2.micro                                    # Default is m1.small
+      NetworkInterfaces:
+        - AssociatePublicIpAddress: true
+          DeviceIndex: "0"
+          SubnetId:
+            Ref: PublicSubnet1
+          GroupSet:
+            - Ref: BastionServerSecurityGroup
+      KeyName: !Ref KeyName
+      Tags:
+        - Key: "Name"
+          Value: "Tyler-CF-BastionHost"
+  BastionServerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: SG for bastion host server.
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - CidrIp: 104.153.231.113/32
+          FromPort: 22
+          IpProtocol: tcp
+          ToPort: 22
+      Tags:
+        - Key: "Name"
+          Value: "Tyler-CF-SG-BastionHost"
+  PrivateServerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: SG for DB servers.
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - CidrIp: 3.101.130.253/32
+          FromPort: 22
+          IpProtocol: tcp
+          ToPort: 22
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          SourceSecurityGroupId: !Select 
+            - 0
+            - !GetAtt 
+              - WebServerLoadBalancer
+              - SecurityGroups
+  ALBSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: SG for ALB in front of web servers.
+      GroupName: "Tyler-CF-Web-LB-SG"
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - 
+          CidrIp: "104.153.231.113/32"
+          FromPort: 80
+          IpProtocol: "tcp"
+          ToPort: 80
+        - 
+          CidrIp: "104.153.231.113/32"
+          FromPort: 443
+          IpProtocol: "tcp"
+          ToPort: 443
+  WebServerLoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Name: "Tyler-CF-Web-LB"
+      IpAddressType: ipv4
+      Scheme: internet-facing
+      Type: application
+      Subnets:
+        - !Ref PublicSubnet1
+        - !Ref PublicSubnet2
+      SecurityGroups: 
+        - !Ref ALBSecurityGroup
+  ALBListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn:
+            Ref: WebServerTargetGroup
+      LoadBalancerArn: 
+        Ref: WebServerLoadBalancer
+      Port: 80
+      Protocol: HTTP
+  WebServerTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Port: 80
+      Protocol: 'HTTP'
+      VpcId: !Ref VPC
+      HealthCheckIntervalSeconds: 30
+      HealthCheckPath: /
+      HealthCheckPort: '80'
+      HealthCheckProtocol: HTTP
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 2
+      Targets:
+        - Id: !Ref WebServer1
+          Port: 80
+        - Id: !Ref WebServer2
+          Port: 80
+      Tags:
+        - Key: "Name"
+          Value: "Tyler-CF-Web-TG"
 
 
     # WebServerAutoScalingGroup:
