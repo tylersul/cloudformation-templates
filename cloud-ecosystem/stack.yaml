@@ -21,6 +21,10 @@ Parameters:
     Description: Please enter the IP range (CIDR notation) for the private subnet in the second Availability Zone
     Type: String
     Default: 172.34.1.0/24
+  KeyName:
+    Description: SSH key used to port into bastion host.
+    Type: String
+    Default: Tyler-CF-Key
 Mappings: 
   RegionMap: 
     us-east-1: 
@@ -98,7 +102,7 @@ Resources:
         VpcId: !Ref VPC
         Tags:
         - Key: Name
-          Value: Public
+          Value: "Tyler-CF-Public-RT"
     PublicRoute1:   # Public route table has direct routing to IGW:
       Type: AWS::EC2::Route
       DependsOn: AttachGateway
@@ -106,16 +110,38 @@ Resources:
         RouteTableId: !Ref PublicRouteTable
         DestinationCidrBlock: 0.0.0.0/0
         GatewayId: !Ref InternetGateway  
-    PublicSubnetARouteTableAssociation:
+    PublicSubnetRouteTableAssociation:
       Type: AWS::EC2::SubnetRouteTableAssociation
       Properties:
         SubnetId: !Ref PublicSubnet1
         RouteTableId: !Ref PublicRouteTable
+    PrivateRouteTable:
+      Type: AWS::EC2::RouteTable
+      Properties:
+        VpcId: !Ref VPC
+        Tags:
+        - Key: Name
+          Value: "Tyler-CF-Private-RT"
+    PrivateRoute1:   # Private route table has direct routing to bastion
+      Type: AWS::EC2::Route
+      DependsOn: AttachGateway
+      Properties:
+        RouteTableId: !Ref PrivateRouteTable
+        DestinationCidrBlock: 0.0.0.0/0
+        GatewayId: !Ref BastionHost
+    PrivateSubnetRouteTableAssociation:
+      Type: AWS::EC2::SubnetRouteTableAssociation
+      Properties:
+        SubnetId: !Ref PrivateSubnet1
+        RouteTableId: !Ref PrivateRouteTable
     NATGateway:
       Type: AWS::EC2::NatGateway
       Properties:
         AllocationId: !GetAtt ElasticIPAddress.AllocationId
         SubnetId: !Ref PublicSubnet1
+        Tags:
+          - Key: "Name"
+            Value: "Tyler-CF-Nat-Gateway"
     ElasticIPAddress:
       Type: AWS::EC2::EIP
       Properties:
@@ -136,7 +162,7 @@ Resources:
         SubnetId:
           Ref: PublicSubnet1
         SecurityGroupIds: 
-          - !GetAtt ServerSecurityGroup.GroupId
+          - !GetAtt PrivateServerSecurityGroup.GroupId
         Tags:
           - Key: "Name"
             Value: "Tyler-CF-WebServer1"
@@ -148,7 +174,7 @@ Resources:
         SubnetId:
           Ref: PublicSubnet2
         SecurityGroupIds: 
-          - !GetAtt ServerSecurityGroup.GroupId
+          - !GetAtt PrivateServerSecurityGroup.GroupId
         Tags:
           - Key: "Name"
             Value: "Tyler-CF-WebServer2"
@@ -160,7 +186,7 @@ Resources:
         SubnetId:
           Ref: PrivateSubnet1
         SecurityGroupIds: 
-          - !GetAtt ServerSecurityGroup.GroupId
+          - !GetAtt PrivateServerSecurityGroup.GroupId
         Tags:
           - Key: "Name"
             Value: "Tyler-CF-DBServer1"
@@ -172,7 +198,7 @@ Resources:
         SubnetId:
           Ref: PrivateSubnet2
         SecurityGroupIds: 
-          - !GetAtt ServerSecurityGroup.GroupId
+          - !GetAtt PrivateServerSecurityGroup.GroupId
         Tags:
           - Key: "Name"
             Value: "Tyler-CF-DBServer2"
@@ -181,26 +207,40 @@ Resources:
       Properties:
         ImageId: !FindInMap [RegionMap, !Ref "AWS::Region", AMI]
         InstanceType: t2.micro                                    # Default is m1.small
-        SubnetId:
-          Ref: PublicSubnet1
-        SecurityGroupIds: 
-          - !GetAtt ServerSecurityGroup.GroupId
+        NetworkInterfaces:
+          - AssociatePublicIpAddress: true
+            DeviceIndex: "0"
+            SubnetId:
+              Ref: PublicSubnet1
+            GroupSet:
+              - Ref: BastionServerSecurityGroup
+        KeyName: !Ref KeyName
         Tags:
           - Key: "Name"
             Value: "Tyler-CF-BastionHost"
-    ServerSecurityGroup:
+    BastionServerSecurityGroup:
       Type: AWS::EC2::SecurityGroup
       Properties:
-        GroupDescription: Example server SG using CloudFormation.
+        GroupDescription: SG for bastion host server.
         VpcId: !Ref VPC
         SecurityGroupIngress:
           - CidrIp: 104.153.231.113/32
-            FromPort: 80
+            FromPort: 22
             IpProtocol: tcp
-            ToPort: 80
+            ToPort: 22
         Tags:
           - Key: "Name"
-            Value: "Tyler-CF-SG"
+            Value: "Tyler-CF-SG-BastionHost"
+    PrivateServerSecurityGroup:
+      Type: AWS::EC2::SecurityGroup
+      Properties:
+        GroupDescription: SG for DB servers.
+        VpcId: !Ref VPC
+        SecurityGroupIngress:
+          - CidrIp: 3.101.130.253/32
+            FromPort: 22
+            IpProtocol: tcp
+            ToPort: 22
     # WebServerLoadBalancer:
     #   Properties:
     #     CrossZone: true
@@ -235,5 +275,5 @@ Outputs:
       Description: A list of the private subnets from this CF stack.
       Value: !Join [ ", ", [ !Ref PrivateSubnet1, !Ref PrivateSubnet2 ]]
     SecurityGroupId:
-      Value: !GetAtt [ServerSecurityGroup, GroupId]
+      Value: !GetAtt [BastionServerSecurityGroup, GroupId]
       Description: Security Group Id
