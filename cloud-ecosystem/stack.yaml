@@ -1,3 +1,4 @@
+# TO DO: Get web server up and running (accessible from browser), confirm IGW is attached, work on ALB
 AWSTemplateFormatVersion: '2010-09-09'
 Description: A simple CloudFormation template
 Parameters:
@@ -214,6 +215,20 @@ Resources:
           GroupSet:
             - Ref: BastionServerSecurityGroup
       KeyName: !Ref KeyName
+      UserData:
+        'Fn::Base64': 
+          !Sub |
+            #!/bin/bash
+            # install apache
+            sudo yum update -y
+            sudo yum install httpd -y  
+            
+            # start server
+            service httpd start
+            chkconfig httpd on
+
+            # navigate to html dir
+            echo "Hello World" > /var/www/html/index.html
       Tags:
         - Key: "Name"
           Value: "Tyler-CF-BastionHost"
@@ -227,6 +242,14 @@ Resources:
           FromPort: 22
           IpProtocol: tcp
           ToPort: 22
+        - CidrIp: 104.153.231.113/32
+          FromPort: 443
+          IpProtocol: tcp
+          ToPort: 443
+        - CidrIp: 104.153.231.113/32
+          FromPort: 80
+          IpProtocol: tcp
+          ToPort: 80
       Tags:
         - Key: "Name"
           Value: "Tyler-CF-SG-BastionHost"
