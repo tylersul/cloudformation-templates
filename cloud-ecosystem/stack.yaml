@@ -300,6 +300,9 @@ Resources:
         - !Ref PublicSubnet2
       SecurityGroups: 
         - !Ref ALBSecurityGroup
+      Tags:
+        - Key: "Name"
+          Value: "Tyler-CF-SG-BastionHost"
   ALBListener:
     Type: AWS::ElasticLoadBalancingV2::Listener
     Properties:
