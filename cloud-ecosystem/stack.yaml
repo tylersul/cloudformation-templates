@@ -1,6 +1,6 @@
 # TO DO: Get web server up and running (accessible from browser), confirm IGW is attached, work on ALB
 AWSTemplateFormatVersion: '2010-09-09'
-Description: A simple CloudFormation template
+Description: A CF template that creates HA infrastructure.
 Parameters:
   VpcCIDR:
     Description: Please enter the IP range (CIDR notation) for this VPC
@@ -82,7 +82,7 @@ Resources:
       CidrBlock: !Ref PublicSubnet1CIDR
       VpcId: 
         Ref: VPC
-      MapPublicIpOnLaunch: False
+      MapPublicIpOnLaunch: true
       Tags:
         - Key: "Name"
           Value: "Tyler-CF-PublicSubnet1"
@@ -159,10 +159,27 @@ Resources:
     Properties:
       ImageId: !FindInMap [RegionMap, !Ref "AWS::Region", AMI]
       InstanceType: t2.micro                                    # Default is m1.small
-      SubnetId:
-        Ref: PublicSubnet1
-      SecurityGroupIds: 
-        - !GetAtt PrivateServerSecurityGroup.GroupId
+      NetworkInterfaces:
+        - AssociatePublicIpAddress: true
+          DeviceIndex: "0"
+          SubnetId:
+            Ref: PublicSubnet1
+          GroupSet:
+            - Ref: BastionServerSecurityGroup
+      UserData:
+        'Fn::Base64': 
+          !Sub |
+            #!/bin/bash
+            # install apache
+            sudo yum update -y
+            sudo yum install httpd -y  
+            
+            # start server
+            service httpd start
+            chkconfig httpd on
+
+            # navigate to html dir
+            echo "Hello World 1" > /var/www/html/index.html
       Tags:
         - Key: "Name"
           Value: "Tyler-CF-WebServer1"
@@ -175,6 +192,20 @@ Resources:
         Ref: PublicSubnet2
       SecurityGroupIds: 
         - !GetAtt PrivateServerSecurityGroup.GroupId
+      UserData:
+        'Fn::Base64': 
+          !Sub |
+            #!/bin/bash
+            # install apache
+            sudo yum update -y
+            sudo yum install httpd -y  
+            
+            # start server
+            service httpd start
+            chkconfig httpd on
+
+            # navigate to html dir
+            echo "Hello World 2" > /var/www/html/index.html
       Tags:
         - Key: "Name"
           Value: "Tyler-CF-WebServer2"
@@ -215,20 +246,6 @@ Resources:
           GroupSet:
             - Ref: BastionServerSecurityGroup
       KeyName: !Ref KeyName
-      UserData:
-        'Fn::Base64': 
-          !Sub |
-            #!/bin/bash
-            # install apache
-            sudo yum update -y
-            sudo yum install httpd -y  
-            
-            # start server
-            service httpd start
-            chkconfig httpd on
-
-            # navigate to html dir
-            echo "Hello World" > /var/www/html/index.html
       Tags:
         - Key: "Name"
           Value: "Tyler-CF-BastionHost"
