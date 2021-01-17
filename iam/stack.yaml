@@ -1,14 +1,30 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Description: A CF template that creates IAM role for external service.
 Resources:
-  Type: AWS::IAM::Role
-  Properties: 
-    Description: A test role for client.
-    AssumeRolePolicyDocument:
-      Version: 2012-10-17
-      Statement:
-        - Effect: Allow
-          Principal:
-            Service:
-              - ec2.amazonaws.com
-          Action: 'sts:AssumeRole'
+  IAMRoleForExternalTool:
+    Type: AWS::IAM::Role
+    Properties: 
+      Description: A test role for client.
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - ec2.amazonaws.com
+            Action: 'sts:AssumeRole'
+        Tags:
+          - Key: "Owner"
+            Value: "Tyler-TU"
+      # Path: /
+      # Policies:
+      #   - PolicyName: root
+      #     PolicyDocument:
+      #       Version: 2012-10-17
+      #       Statement:
+      #         - Effect: Allow
+      #           Action: '*'
+      #           Resource: '*'
+  ExternalToolPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
