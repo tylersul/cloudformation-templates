@@ -28,3 +28,10 @@ Resources:
   ExternalToolPolicy:
     Type: AWS::IAM::ManagedPolicy
     Properties:
+      ManagedPolicyName: TylerAssumeRolePolicy
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action: sts:AssumeRole
+            Resource: !GetAtt IAMRoleForExternalTool
