@@ -1,3 +1,4 @@
+# CLI CALL - ws cloudformation create-stack --stack-name <StackName> --template-body file://<FileName> --capabilities CAPABILITY_IAM
 AWSTemplateFormatVersion: '2010-09-09'
 Description: A CF template that creates IAM role for external service.
 Resources:
@@ -32,6 +33,9 @@ Resources:
       PolicyDocument:
         Version: '2012-10-17'
         Statement:
-          - Effect: Allow
-            Action: sts:AssumeRole
-            Resource: !GetAtt IAMRoleForExternalTool
+          Effect: Allow
+          Action:
+          - iam:Get*
+          - iam:List*
+          - iam:Generate*
+          Resource: "*"
