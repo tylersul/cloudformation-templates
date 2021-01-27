@@ -1,5 +1,6 @@
 # CLI CALL - ws cloudformation create-stack --stack-name <StackName> --template-body file://<FileName> --capabilities CAPABILITY_IAM
-# In some cases, must explicityl acknowledge that your stack template contains certain capabilities 
+# In some cases, must explicitly acknowledge that your stack template contains certain capabilities 
+# If you have IAM resources, you can specify either capability (link to AWS CLI reference: https://docs.aws.amazon.com/cli/latest/reference/cloudformation/create-stack.html)
 # Resources in this template affect permissions in AWS account
 AWSTemplateFormatVersion: '2010-09-09'
 Description: A CF template that creates IAM role for external service.
