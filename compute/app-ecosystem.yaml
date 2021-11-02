@@ -14,14 +14,15 @@ Resources:
   VPC:
     Type: AWS::EC2::VPC
     Properties:
-      CidrBlock: 10.16.0.0/16
+      CidrBlock: 10.1.0.0/16
       EnableDnsSupport: true
       EnableDnsHostnames: true
       Tags:
         - Key: Name
-          Value: "Tyler-App-VPC"
+          Value: !Join ['', [!Ref "AWS::StackName", "-VPC" ]]
   InternetGateway:
     Type: 'AWS::EC2::InternetGateway'
+    DependsOn: VPC
     Properties:
       Tags:
       - Key: Name
@@ -31,147 +32,73 @@ Resources:
     Properties:
       VpcId: !Ref VPC
       InternetGatewayId: !Ref InternetGateway
-  SubnetAppA:
+  SubnetPublicA:
     Type: AWS::EC2::Subnet
     Properties:
       VpcId: !Ref VPC
       AvailabilityZone: !Select [ 0, !GetAZs '' ]
-      CidrBlock: 10.16.32.0/20
+      CidrBlock: 10.1.10.0/24
+      MapPublicIpOnLaunch: true
       Tags:
         - Key: Name
-          Value: sn-app-A
-  SubnetAppB:
+          Value: !Sub ${AWS::StackName}-Public-A
+  SubnetPublicB:
     Type: AWS::EC2::Subnet
     Properties:
       VpcId: !Ref VPC
       AvailabilityZone: !Select [ 1, !GetAZs '' ]
-      CidrBlock: 10.16.96.0/20
+      CidrBlock: 10.1.20.0/24
+      MapPublicIpOnLaunch: true
       Tags:
         - Key: Name
-          Value: sn-app-B
-  SubnetAppC:
-    Type: AWS::EC2::Subnet
-    Properties:
-      VpcId: !Ref VPC
-      AvailabilityZone: !Select [ 2, !GetAZs '' ]
-      CidrBlock: 10.16.160.0/20
-      Tags:
-        - Key: Name
-          Value: sn-app-C
-  SubnetWebA:
+          Value: !Sub ${AWS::StackName}-Public-B
+  SubnetPrivateA:
     Type: AWS::EC2::Subnet
     Properties:
       VpcId: !Ref VPC
       AvailabilityZone: !Select [ 0, !GetAZs '' ]
-      CidrBlock: 10.16.48.0/20
-      MapPublicIpOnLaunch: true
+      CidrBlock: 10.1.50.0/24
       Tags:
         - Key: Name
-          Value: sn-web-A
-  SubnetWebB:
+          Value: !Sub ${AWS::StackName}-Private-A
+  SubnetPrivateB:
     Type: AWS::EC2::Subnet
     Properties:
       VpcId: !Ref VPC
       AvailabilityZone: !Select [ 1, !GetAZs '' ]
-      CidrBlock: 10.16.112.0/20
-      MapPublicIpOnLaunch: true
+      CidrBlock: 10.1.60.0/24
       Tags:
         - Key: Name
-          Value: sn-web-B
-  SubnetWebC:
-    Type: AWS::EC2::Subnet
-    Properties:
-      VpcId: !Ref VPC
-      AvailabilityZone: !Select [ 2, !GetAZs '' ]
-      CidrBlock: 10.16.176.0/20
-      MapPublicIpOnLaunch: true
-      Tags:
-        - Key: Name
-          Value: sn-web-C
-  RouteTableWeb: 
+          Value: !Sub ${AWS::StackName}-Private-B
+  RouteTablePublic: 
     Type: 'AWS::EC2::RouteTable'
     Properties:
       VpcId: !Ref VPC
       Tags:
       - Key: Name
-        Value: tyler-vpc1-rt-web
+        Value: Public
   # Public route table has direct routing to IGW:
-  RouteTableWebDefaultIPv4: 
+  RoutePublic1: 
     Type: 'AWS::EC2::Route'
     DependsOn: InternetGatewayAttachment
     Properties:
-      RouteTableId:
-        Ref: RouteTableWeb
+      RouteTableId: !Ref RouteTablePublic
       DestinationCidrBlock: '0.0.0.0/0'
-      GatewayId:
-        Ref: InternetGateway
-  PublicSubnetRouteTableAssociation:
+      GatewayId: !Ref InternetGateway
+  RouteTableAssociationSubnetPublicA:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
-      SubnetId: !Ref SubnetWebA
-      RouteTableId: !Ref RouteTableWeb
-  WebServer1:
-    Type: AWS::EC2::Instance
+      SubnetId: !Ref SubnetPublicA
+      RouteTableId: !Ref RouteTablePublic
+  RouteTableAssociationSubnetPublicB:
+    Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
-      ImageId: !FindInMap [RegionMap, !Ref "AWS::Region", AMI]
-      InstanceType: t2.micro                                    # Default is m1.small
-      NetworkInterfaces:
-        - AssociatePublicIpAddress: true
-          DeviceIndex: "0"
-          SubnetId:
-            Ref: SubnetWebA
-          GroupSet:
-            - Ref: WebServerSecurityGroup
-      UserData:
-        'Fn::Base64': 
-          !Sub |
-            #!/bin/bash
-            # install apache
-            sudo yum update -y
-            sudo yum install httpd -y  
-            
-            # start server
-            service httpd start
-            chkconfig httpd on
-
-            # navigate to html dir
-            echo "Hello World 1" > /var/www/html/index.html
-      Tags:
-        - Key: "Name"
-          Value: "Tyler-CF-WebServer1"
-  WebServer2:
-    Type: AWS::EC2::Instance
-    Properties:
-      ImageId: !FindInMap [RegionMap, !Ref "AWS::Region", AMI]
-      InstanceType: t2.micro                                    # Default is m1.small
-      NetworkInterfaces:
-        - AssociatePublicIpAddress: true
-          DeviceIndex: "0"
-          SubnetId:
-            Ref: SubnetWebB
-          GroupSet:
-            - Ref: WebServerSecurityGroup
-      UserData:
-        'Fn::Base64': 
-          !Sub |
-            #!/bin/bash
-            # install apache
-            sudo yum update -y
-            sudo yum install httpd -y  
-            
-            # start server
-            service httpd start
-            chkconfig httpd on
-
-            # navigate to html dir
-            echo "Hello World 1" > /var/www/html/index.html
-      Tags:
-        - Key: "Name"
-          Value: "Tyler-CF-WebServer2"
+      SubnetId: !Ref SubnetPublicB
+      RouteTableId: !Ref RouteTablePublic
   WebServerSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupDescription: SG for web server.
+      GroupDescription: SG for web servers.
       VpcId: !Ref VPC
       SecurityGroupIngress:
         - CidrIp: 24.12.77.228/32
@@ -186,24 +113,89 @@ Resources:
           FromPort: 80
           IpProtocol: tcp
           ToPort: 80
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          SourceSecurityGroupId:
+            Fn::GetAtt:
+            - ALBSecurityGroup
+            - GroupId
       Tags:
-        - Key: "Name"
-          Value: "Tyler-CF-SG-Web"
-  WebServerLoadBalancer:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-WebServerSecurityGroup
+  WebServer1:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: !FindInMap [RegionMap, !Ref "AWS::Region", AMI]
+      InstanceType: t2.micro                                    # Default is m1.small
+      NetworkInterfaces:
+        - AssociatePublicIpAddress: true
+          DeviceIndex: "0"
+          SubnetId:
+            Ref: SubnetPublicA
+          GroupSet:
+            - Ref: WebServerSecurityGroup
+      UserData:
+        'Fn::Base64': 
+          !Sub |
+            #!/bin/bash
+            # install apache
+            sudo yum update -y
+            sudo yum install httpd -y  
+            
+            # start server
+            service httpd start
+            chkconfig httpd on
+
+            # navigate to html dir
+            echo "Hello World" > /var/www/html/index.html
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-WebServer1
+  WebServer2:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: !FindInMap [RegionMap, !Ref "AWS::Region", AMI]
+      InstanceType: t2.micro                                    # Default is m1.small
+      NetworkInterfaces:
+        - AssociatePublicIpAddress: true
+          DeviceIndex: "0"
+          SubnetId:
+            Ref: SubnetPublicB
+          GroupSet:
+            - Ref: WebServerSecurityGroup
+      UserData:
+        'Fn::Base64': 
+          !Sub |
+            #!/bin/bash
+            # install apache
+            sudo yum update -y
+            sudo yum install httpd -y  
+            
+            # start server
+            service httpd start
+            chkconfig httpd on
+
+            # navigate to html dir
+            echo "Hello World 2" > /var/www/html/index.html
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-WebServer2
+  LoadBalancerWebServer:
     Type: AWS::ElasticLoadBalancingV2::LoadBalancer
     Properties:
-      Name: "Tyler-CF-Web-LB"
+      Name: !Sub ${AWS::StackName}-ALB
       IpAddressType: ipv4
       Scheme: internet-facing
       Type: application
       Subnets:
-        - !Ref SubnetWebA
-        - !Ref SubnetWebB
+        - !Ref SubnetPublicA
+        - !Ref SubnetPublicB
       SecurityGroups: 
         - !Ref ALBSecurityGroup
       Tags:
-        - Key: "Name"
-          Value: "Tyler-CF-ALB"
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-ALB
   ALBSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
@@ -229,7 +221,7 @@ Resources:
           TargetGroupArn:
             Ref: WebServerTargetGroup
       LoadBalancerArn: 
-        Ref: WebServerLoadBalancer
+        Ref: LoadBalancerWebServer
       Port: 80
       Protocol: HTTP
   WebServerTargetGroup:
@@ -252,16 +244,4 @@ Resources:
       Tags:
         - Key: "Name"
           Value: "Tyler-CF-Web-TG"
-Outputs:
-    VPC: 
-      Description: VPC created from this CF stack.
-      Value: !Ref VPC
-    WebSubnets:
-      Description: A list of the public subnets from this CF stack.
-      Value: !Join [ ", ", [ !Ref SubnetWebA, !Ref SubnetWebB, !Ref SubnetWebC ]]
-    AppSubnets:
-      Description: A list of the private subnets from this CF stack.
-      Value: !Join [ ", ", [ !Ref SubnetAppA, !Ref SubnetAppB, !Ref SubnetAppC,]]
-    SecurityGroupId:
-      Value: !GetAtt [WebServerSecurityGroup, GroupId]
-      Description: Security Group Id for the web server.
+  
