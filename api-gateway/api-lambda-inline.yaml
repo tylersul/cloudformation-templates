@@ -1,0 +1,74 @@
+# Template: Creates a REST API gateway integrated w/ a lambda function
+# Example here is inline code defined within template for Lambda
+
+# CLI CALL - aws cloudformation create-stack --stack-name <StackName> --template-body file://<FileName> --capabilities CAPABILITY_IAM
+# In some cases, must explicitly acknowledge that your stack template contains certain capabilities 
+AWSTemplateFormatVersion: '2010-09-09'
+Description: A CF template that creates a VPC for Resource Access Manager
+Mappings: 
+  RegionMap: 
+    us-east-1: 
+      AMI: "ami-04d29b6f966df1537"
+    us-west-1: 
+      AMI: "ami-08d9a394ac1c2994c"
+Resources:
+  ApiGatewayRest:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      Description: Test API integration w/ Lambda.
+      EndpointConfiguration: 
+        Types: 
+          - Regional
+      Name: TestCFApi
+  ResourceApiGatewayRandom:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      ParentId: !GetAtt
+        - ApiGatewayRest
+        - RootResourceId
+      PathPart: random
+      RestApiId: !Ref ApiGatewayRest
+  MethodApiGatewayRandom:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      AuthorizationType: NONE
+      HttpMethod: GET
+      ResourceId: !Ref ResourceApiGatewayRandom
+      RestApiId: !Ref ApiGatewayRest
+  LambdaRandom:
+    Type: AWS::Lambda::Function
+    Properties:
+      Description: Test Lambda function integrated w/ API.
+      FunctionName: RandomLambda
+      Handler: index.handler
+      Role: arn:aws:iam::938884152055:role/service-role/TestFunciton-role-2p33j9j7
+      Runtime: nodejs12.x
+      Code:
+        ZipFile:  |
+          console.log('Loading function');
+
+          exports.handler = async (event) => {
+              let min = 0;
+              let max = 10;
+              let responseCode = 200;
+              
+              let generatedNumber = Math.floor(Math.random() * max) + min;
+              
+              let responseBody = {
+                  message: generatedNumber,
+                  input: event
+              }
+              
+              let response = {
+                  statusCode: responseCode,
+                  headers: {
+                      "x-custom-header" : "my custom header value"
+                  },
+                  body: JSON.stringify(responseBody)
+              }
+              
+              console.log("response: " + JSON.stringify(response));
+              return response;
+              
+          };
+
