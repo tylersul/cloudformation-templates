@@ -5,21 +5,18 @@
 # In some cases, must explicitly acknowledge that your stack template contains certain capabilities 
 AWSTemplateFormatVersion: '2010-09-09'
 Description: A CF template that creates a VPC for Resource Access Manager
-Mappings: 
-  RegionMap: 
-    us-east-1: 
-      AMI: "ami-04d29b6f966df1537"
-    us-west-1: 
-      AMI: "ami-08d9a394ac1c2994c"
+
 Resources:
+  
   ApiGatewayRest:
     Type: AWS::ApiGateway::RestApi
     Properties:
       Description: Test API integration w/ Lambda.
       EndpointConfiguration: 
         Types: 
-          - Regional
+          - REGIONAL
       Name: TestCFApi
+
   ResourceApiGatewayRandom:
     Type: AWS::ApiGateway::Resource
     Properties:
@@ -28,13 +25,58 @@ Resources:
         - RootResourceId
       PathPart: random
       RestApiId: !Ref ApiGatewayRest
+
   MethodApiGatewayRandom:
     Type: AWS::ApiGateway::Method
     Properties:
       AuthorizationType: NONE
       HttpMethod: GET
+      Integration:  
+        IntegrationHttpMethod: POST
+        Type: AWS_PROXY
+        Credentials: !GetAtt IamRoleApiGateway.Arn
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LambdaRandom.Arn}/invocations'
       ResourceId: !Ref ResourceApiGatewayRandom
       RestApiId: !Ref ApiGatewayRest
+
+  ApiGatewayDeployment:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn: MethodApiGatewayRandom
+    Properties:
+      Description: Lambda API Deployment
+      RestApiId: !Ref ApiGatewayRest
+
+  ApiGatewayStage:
+    Type: AWS::ApiGateway::Stage
+    Properties:
+      DeploymentId: !Ref ApiGatewayDeployment
+      Description: Lambda API Stage v0
+      RestApiId: !Ref ApiGatewayRest
+      StageName: 'Dev'
+
+  IamRoleApiGateway:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: ''
+            Effect: 'Allow'
+            Principal:
+              Service:
+                - 'apigateway.amazonaws.com'
+            Action:
+              - 'sts:AssumeRole'
+      Path: '/'
+      Policies:
+        - PolicyName: LambdaAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: 'Allow'
+                Action: 'lambda:*'
+                Resource: !GetAtt LambdaRandom.Arn
+
   LambdaRandom:
     Type: AWS::Lambda::Function
     Properties:
@@ -71,4 +113,20 @@ Resources:
               return response;
               
           };
-
+          
+  PermissionLambdaRandom:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:invokeFunction
+      FunctionName: !Ref LambdaRandom
+      Principal: apigateway.amazonaws.com
+      SourceArn:
+        Fn::Join:
+        - ''
+        - - 'arn:aws:execute-api:'
+          - Ref: AWS::Region
+          - ":"
+          - Ref: AWS::AccountId
+          - ":"
+          - Ref: ApiGatewayRest
+          - "/*/GET/random"
