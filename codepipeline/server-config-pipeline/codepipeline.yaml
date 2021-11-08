@@ -1,3 +1,6 @@
+# DEPLOY SECOND
+# Creates a Codepipeline w/ S3 as the artifact source
+# Pipeline uses configuration zip file stored in S3 bucket as a template file for a Cloudformation stack
 AWSTemplateFormatVersion: "2010-09-09"
 
 Description: AWS CloudFormation Template that deploys a Codepipeline instance.
@@ -26,14 +29,14 @@ Resources:
           Name: Source
           Actions: 
             -
-              Name: TemplateSource
+              Name: Source
               ActionTypeId:
                 Category: Source
                 Owner: AWS
                 Version: '1'
                 Provider: S3
               OutputArtifacts:
-                - Name: TemplateSource
+                - Name: SourceArtifact
               Configuration:
                 S3Bucket: !ImportValue S3BucketName
                 S3ObjectKey: !Ref S3ObjectKey
@@ -43,7 +46,7 @@ Resources:
             -
               Name: DeployStage
               InputArtifacts:
-                - Name: SourceOutput
+                - Name: SourceArtifact
               ActionTypeId:
                 Category: Deploy
                 Owner: AWS
@@ -53,6 +56,5 @@ Resources:
                 ActionMode: CREATE_UPDATE
                 RoleArn: !ImportValue RoleCloudformationArn
                 StackName: infra-test-stack
-                TemplateConfiguration: TemplateSource::testConfig.json
-                TemplatePath: TemplateSource::config.zip
+                TemplatePath: SourceArtifact::vpcTemplate.json
 

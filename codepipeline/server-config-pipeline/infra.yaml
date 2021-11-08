@@ -82,7 +82,7 @@ Resources:
       VersioningConfiguration: 
         Status: Enabled
 
-
+# Exports are referenced in the Codepipeline.yaml file
 Outputs:
   RoleArn:
     Value: !GetAtt RoleCodePipeline.Arn
