@@ -1,3 +1,4 @@
+# DEPLOY FIRST - this template is a pre-requisite to the CodePipeline deployment and has multiple resources dyanmically referenced in the CP yaml file
 AWSTemplateFormatVersion: "2010-09-09"
 
 Description: AWS CloudFormation Template that deploys a Codepipeline instance.
@@ -18,13 +19,15 @@ Parameters:
     Default: ami-01cc34ab2709337aa
 
 Resources:
+  # SNS Topic for Codepipeline notifications
   SNSTopicCodePipeline:
     Type: AWS::SNS::Topic
     Properties:
       Subscription:
         - Endpoint: !Ref Email
           Protocol: email
-              
+
+  # Role for Codepipeline access to: S3 (Bucket for configuration files), Cloudformation (Deploy yaml file), IAM (Cloudformation role assumption), and SNS (Publush to topic)        
   RoleCodePipeline:
     Type: AWS::IAM::Role
     Properties:
@@ -49,6 +52,7 @@ Resources:
                 Effect: Allow
                 Resource: '*'
   
+  # Role that gives Cloudformation permissions to assume role & interact with EC2 servce
   RoleCloudformation:
     Type: AWS::IAM::Role
     Properties:
@@ -70,6 +74,7 @@ Resources:
                 Effect: Allow
                 Resource: '*'
 
+  # S3 bucket used to store configuration files used in Codepipeline deployment
   S3BucketPipelineSource:
     Type: AWS::S3::Bucket
     Properties: 
