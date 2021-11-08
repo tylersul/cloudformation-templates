@@ -1,0 +1,58 @@
+AWSTemplateFormatVersion: "2010-09-09"
+
+Description: AWS CloudFormation Template that deploys a Codepipeline instance.
+
+Parameters:
+  S3BucketPipelineSource:
+    Description: Source bucket for S3 sourced CodePipeline.
+    Type: String
+    Default: ts-codepipeline-bucket
+  S3ObjectKey:
+    Description: Source key for S3 pipeline stage.
+    Type: String
+    Default: 'config.zip'
+
+Resources:
+  Pipeline:
+    Type: AWS::CodePipeline::Pipeline
+    Properties:
+      ArtifactStore:
+        Type: S3
+        Location: !Ref S3BucketPipelineSource
+      Name: test-cfn-pipeline
+      RoleArn: !ImportValue RoleArn
+      Stages: 
+        -
+          Name: Source
+          Actions: 
+            -
+              Name: TemplateSource
+              ActionTypeId:
+                Category: Source
+                Owner: AWS
+                Version: '1'
+                Provider: S3
+              OutputArtifacts:
+                - Name: TemplateSource
+              Configuration:
+                S3Bucket: !ImportValue S3BucketName
+                S3ObjectKey: !Ref S3ObjectKey
+        -
+          Name: Deploy
+          Actions:  
+            -
+              Name: DeployStage
+              InputArtifacts:
+                - Name: SourceOutput
+              ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Version: '1'
+                Provider: CloudFormation
+              Configuration:
+                ActionMode: CREATE_UPDATE
+                RoleArn: !ImportValue RoleCloudformationArn
+                StackName: infra-test-stack
+                TemplateConfiguration: TemplateSource::testConfig.json
+                TemplatePath: TemplateSource::config.zip
+

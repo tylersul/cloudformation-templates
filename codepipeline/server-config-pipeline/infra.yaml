@@ -1,0 +1,93 @@
+AWSTemplateFormatVersion: "2010-09-09"
+
+Description: AWS CloudFormation Template that deploys a Codepipeline instance.
+
+Parameters:
+  Email:
+    Description: The email address where CodePipeline sends pipeline notifications
+    Type: String
+  BucketName:
+    Description: Name of bucket to use as Code Pipline source.
+    Type: String
+    Default: ts-codepipeline-bucket
+    AllowedPattern: '[a-z0-9\-]*'
+    ConstraintDescription: Lowercase letters, numbers, and hyphens 
+  ImageID:
+    Description: AMI ID for latest free tier Amzn Linux
+    Type: String
+    Default: ami-01cc34ab2709337aa
+
+Resources:
+  SNSTopicCodePipeline:
+    Type: AWS::SNS::Topic
+    Properties:
+      Subscription:
+        - Endpoint: !Ref Email
+          Protocol: email
+              
+  RoleCodePipeline:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+        - Action: ['sts:AssumeRole']
+          Effect: Allow
+          Principal:
+            Service: [codepipeline.amazonaws.com]
+        Version: '2012-10-17'
+      Path: /
+      Policies:
+        - PolicyName: CodePipelineAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Action:
+                - 's3:*'
+                - 'cloudformation:*'
+                - 'iam:PassRole'
+                - 'sns:Publish'
+                Effect: Allow
+                Resource: '*'
+  
+  RoleCloudformation:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+        - Action: ['sts:AssumeRole']
+          Effect: Allow
+          Principal:
+            Service: [cloudformation.amazonaws.com]
+        Version: '2012-10-17'
+      Path: /
+      Policies:
+        - PolicyName: CloudFormationRole
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Action:
+                  - 'ec2:*'
+                Effect: Allow
+                Resource: '*'
+
+  S3BucketPipelineSource:
+    Type: AWS::S3::Bucket
+    Properties: 
+      BucketName: !Ref BucketName
+      VersioningConfiguration: 
+        Status: Enabled
+
+
+Outputs:
+  RoleArn:
+    Value: !GetAtt RoleCodePipeline.Arn
+    Export:
+      Name: RoleArn
+  RoleCloudformationArn:
+    Value: !GetAtt RoleCloudformation.Arn
+    Export:
+      Name: RoleCloudformationArn
+  BucketName:
+    Value: !Ref S3BucketPipelineSource
+    Export:
+      Name: S3BucketName

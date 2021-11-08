@@ -1,0 +1,44 @@
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Parameters": {
+        "ImageId": {
+            "Description": "Image Id to deploy the EC2 Instances from",
+            "Type" : "String",
+            "Default": "ami-01cc34ab2709337aa"
+        }
+    },
+    "Resources": {
+        "myVpc": {
+            "Type": "AWS::EC2::VPC",
+            "Properties": {
+                "CidrBlock" : "10.0.0.0/16"
+            }
+        },
+        "mySubnet": {
+            "Type": "AWS::EC2::Subnet",
+            "Properties": {
+                "VpcId": {
+                    "Ref": "myVpc"
+                },
+                "CidrBlock" : "10.0.0.0/24"
+            }
+        },
+        "myInstance": {
+            "Type": "AWS::EC2::Instance",
+            "Properties": {
+                "NetworkInterfaces": [
+                    {
+                        "DeviceIndex": "0",
+                        "SubnetId": {
+                            "Ref": "mySubnet"
+                        }
+                    }
+                ], 
+                "InstanceType": "t2.micro",
+                "ImageId" : {
+                    "Ref": "ImageId"
+                }
+            }
+        }
+    }
+}
