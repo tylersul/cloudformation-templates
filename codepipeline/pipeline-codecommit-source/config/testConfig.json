@@ -1,0 +1,6 @@
+{
+    "Parameters" : {
+      "ImageId" : "ami-abf2a9ce",
+      "KeyName" : "ssh-test"
+    }
+  }

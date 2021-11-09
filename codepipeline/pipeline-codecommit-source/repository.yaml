@@ -1,0 +1,63 @@
+AWSTemplateFormatVersion: '2010-09-09'
+
+Description: A CF template that creates a pipeline with CodeCommit as the source.
+
+Parameters:
+  S3ObjectKey:
+    Description: Source key for S3 pipeline stage.
+    Type: String
+    Default: 'config.zip'
+
+
+Resources:
+  CodeCommitSourceRepo:
+    Type: AWS::CodeCommit::Repository
+    Properties:
+      Code:
+        S3: 
+          Bucket: !ImportValue S3CodeCommitBucketName
+          Key: !Ref S3ObjectKey
+      RepositoryDescription: CodeCommit repo used as source for CodePipeline.
+      RepositoryName: codepipeline-source
+
+  Pipeline:
+    Type: AWS::CodePipeline::Pipeline
+    Properties:
+      ArtifactStore:
+        Type: S3
+        Location: !ImportValue S3CodeCommitBucketName
+      Name: codecommit-cfn-pipeline
+      RoleArn: !ImportValue RoleCodePipelineArn
+      Stages: 
+        -
+          Name: Source
+          Actions: 
+            -
+              Name: Source
+              ActionTypeId:
+                Category: Source
+                Owner: AWS
+                Version: '1'
+                Provider: CodeCommit
+              OutputArtifacts:
+                - Name: SourceArtifact
+              Configuration:
+                BranchName: main
+                RepositoryName: !GetAtt CodeCommitSourceRepo.Name
+        -
+          Name: Deploy
+          Actions:  
+            -
+              Name: DeployStage
+              InputArtifacts:
+                - Name: SourceArtifact
+              ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Version: '1'
+                Provider: CloudFormation
+              Configuration:
+                ActionMode: CREATE_UPDATE
+                RoleArn: !ImportValue RoleCloudformationArn
+                StackName: infra-test-stack
+                TemplatePath: SourceArtifact::vpcTemplate.json

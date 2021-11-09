@@ -1,0 +1,60 @@
+# DEPLOY FIRST
+
+AWSTemplateFormatVersion: '2010-09-09'
+
+Description: A CF template that creates a VPC for Resource Access Manager
+
+Parameters:
+  BucketName:
+    Description: Name of bucket to use as Code Pipline source.
+    Type: String
+    Default: ts-codepipeline-codecommit-bucket
+    AllowedPattern: '[a-z0-9\-]*'
+    ConstraintDescription: Lowercase letters, numbers, and hyphens 
+
+Resources:
+
+  # Role for Codepipeline access to: S3 (Bucket for configuration files), Cloudformation (Deploy yaml file), IAM (Cloudformation role assumption), and SNS (Publush to topic)        
+  RoleCodePipeline:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+        - Action: ['sts:AssumeRole']
+          Effect: Allow
+          Principal:
+            Service: [codepipeline.amazonaws.com]
+        Version: '2012-10-17'
+      Path: /
+      Policies:
+        - PolicyName: CodePipelineAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Action:
+                - 's3:*'
+                - 'cloudformation:*'
+                - 'codecommit:*'
+                - 'iam:PassRole'
+                - 'sns:Publish'
+                Effect: Allow
+                Resource: '*'
+
+  # S3 bucket used to store configuration files used in Codepipeline deployment
+  S3BucketPipelineSource:
+    Type: AWS::S3::Bucket
+    Properties: 
+      BucketName: !Ref BucketName
+      VersioningConfiguration: 
+        Status: Enabled
+
+# Exports are referenced in the respository.yaml file
+Outputs:
+  BucketName:
+    Value: !Ref S3BucketPipelineSource
+    Export:
+      Name: S3CodeCommitBucketName
+  RoleArn:
+    Value: !GetAtt RoleCodePipeline.Arn
+    Export:
+      Name: RoleCodePipelineArn
