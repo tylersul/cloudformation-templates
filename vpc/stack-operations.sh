@@ -13,11 +13,11 @@ then
     aws cloudformation create-stack \
     --stack-name ${STACK_NAME} \
     --template-body file://app-ecosystem.yaml \
-    --capabilities CAPABILITY__NAMED_IAM \
+    --capabilities CAPABILITY_IAM \
     --profile ${PROFILE}
     )
 
-    echo "Waiting on ${STACK_ID} create completion..."
+    printf "Waiting on: \n ${STACK_ID} \n create completion...\n"
 fi
 
 if [ $OPERATION == 2 ]
@@ -29,9 +29,9 @@ then
     aws cloudformation update-stack \
     --stack-name ${STACK_NAME} \
     --template-body file://app-ecosystem.yaml \
-    --capabilities CAPABILITY_NAMED_IAM \
+    --capabilities CAPABILITY_IAM \
     --profile ${PROFILE}
     )
 
-    echo "Waiting on ${STACK_ID} update completion..."
+    printf "Waiting on: \n ${STACK_ID} \n update completion...\n"
 fi
