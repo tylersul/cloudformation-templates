@@ -1,0 +1,29 @@
+AWSTemplateFormatVersion: '2010-09-09'
+
+Description: A CF template that creates a CodeDeploy Application.
+
+Mappings: 
+  RegionMap: 
+    us-east-1: 
+      AMI: "ami-04d29b6f966df1537"
+    us-west-1: 
+      AMI: "ami-08d9a394ac1c2994c"
+
+Resources:
+
+  ApplicationNode:
+    Type: AWS::CodeDeploy::Application
+    Properties:
+      ApplicationName: ExampleNodeApp
+      ComputePlatform: Server
+
+  DeploymentGroup:
+    Type: AWS::CodeDeploy::DeploymentGroup
+    Properties:
+      ApplicationName: !Ref ApplicationNode
+      DeploymentConfigName: CodeDeployDefault.AllAtOnce
+      DeploymentGroupName: NodeDeploymentGroup
+      Ec2TagFilters:
+        - Key: "Name"
+          Type: KEY_ONLY
+      ServiceRoleArn: !ImportValue RoleCodeDeployArn
