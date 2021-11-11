@@ -2,3 +2,4 @@ node_modules
 
 codepipeline/.DS_Store
 codepipeline/server-config-pipeline/.DS_Store
+codedeploy/deployment/.DS_Store
