@@ -1,0 +1,68 @@
+AWSTemplateFormatVersion: '2010-09-09'
+
+Description: A CF template that creates tbd.
+
+Resources:
+
+
+  ApplicationCodeDeployLinux:
+    Type: AWS::CodeDeploy::Application
+    Properties:
+      ApplicationName: ExampleLinuxApp
+      ComputePlatform: Server
+
+  DeploymentGroup:
+    Type: AWS::CodeDeploy::DeploymentGroup
+    Properties:
+      ApplicationName: !Ref ApplicationCodeDeployLinux
+      AutoRollbackConfiguration: 
+        Enabled: true 
+        Events:
+          - DEPLOYMENT_FAILURE
+      DeploymentConfigName: CodeDeployDefault.AllAtOnce
+      DeploymentGroupName: LinuxDeploymentGroup
+      Ec2TagFilters:
+        - Key: "Name"
+          Type: KEY_ONLY
+      ServiceRoleArn: !ImportValue RoleCodeDeployArn
+
+  Pipeline:
+    Type: AWS::CodePipeline::Pipeline
+    Properties:
+      ArtifactStore:
+        Type: S3
+        Location: !ImportValue S3CodeDeployBucketName
+      Name: codecommit-cfn-pipeline
+      RoleArn: !ImportValue RoleCodePipelineArn
+      Stages: 
+        -
+          Name: Source
+          Actions: 
+            -
+              Name: Source
+              ActionTypeId:
+                Category: Source
+                Owner: AWS
+                Version: '1'
+                Provider: CodeCommit
+              OutputArtifacts:
+                - Name: SourceArtifact
+              Configuration:
+                BranchName: main
+                RepositoryName: !ImportValue RepositoryName
+        -
+          Name: Deploy
+          Actions:  
+            -
+              Name: DeployStage
+              InputArtifacts:
+                - Name: SourceArtifact
+              ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Version: '1'
+                Provider: CodeDeploy
+              Configuration:
+                ApplicationName: ExampleLinuxApp
+                DeploymentGroupName: LinuxDeploymentGroup
+              Region: us-east-1

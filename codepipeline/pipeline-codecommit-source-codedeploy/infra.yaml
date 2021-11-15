@@ -1,0 +1,318 @@
+AWSTemplateFormatVersion: '2010-09-09'
+
+Description: A CF template that creates tbd.
+
+Mappings: 
+  RegionMap: 
+    us-east-1: 
+      AMI: "ami-04d29b6f966df1537"
+    us-west-1: 
+      AMI: "ami-08d9a394ac1c2994c"
+
+Parameters:
+  BucketName:
+    Description: Name of bucket to use as Code Pipline source.
+    Type: String
+    Default: ts-codedeploy-bucket
+    AllowedPattern: '[a-z0-9\-]*'
+    ConstraintDescription: Lowercase letters, numbers, and hyphens 
+
+  Key:
+    Description: SSH key name.
+    Type: String
+    Default: ssh-test
+
+Resources:
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.1.0.0/16
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - Key: Name
+          Value: !Join ['', [!Ref "AWS::StackName", "-VPC" ]]
+  
+  InternetGateway:
+    Type: 'AWS::EC2::InternetGateway'
+    DependsOn: VPC
+    Properties:
+      Tags:
+      - Key: Name
+        Value: "CodeDeploy-VPC-IGW"
+  
+  InternetGatewayAttachment:
+    Type: 'AWS::EC2::VPCGatewayAttachment'
+    Properties:
+      VpcId: !Ref VPC
+      InternetGatewayId: !Ref InternetGateway
+
+  SubnetPublicA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [ 0, !GetAZs '' ]
+      CidrBlock: 10.1.10.0/24
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-Public-A
+
+  # Route table for public subnets.  Includes routes with pathways to IGW.
+  RouteTablePublic: 
+    Type: 'AWS::EC2::RouteTable'
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+      - Key: Name
+        Value: Public
+
+  # Route to IGW for a public route table.
+  RoutePublic1: 
+    Type: 'AWS::EC2::Route'
+    DependsOn: InternetGatewayAttachment
+    Properties:
+      RouteTableId: !Ref RouteTablePublic
+      DestinationCidrBlock: '0.0.0.0/0'
+      GatewayId: !Ref InternetGateway
+
+  RouteTableAssociationSubnetPublicA:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref SubnetPublicA
+      RouteTableId: !Ref RouteTablePublic
+
+  S3BucketDeploymentSource:
+    Type: AWS::S3::Bucket
+    Properties: 
+      BucketName: !Ref BucketName
+
+  RoleCodeDeploy:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+        - Action: ['sts:AssumeRole']
+          Effect: Allow
+          Principal:
+            Service: [codedeploy.amazonaws.com]
+        Version: '2012-10-17'
+      Path: /
+      Policies:
+        - PolicyName: CodePipelineAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Action:
+                - 's3:*'
+                - 'ec2:*'
+                - 'codecommit:*'
+                - 'iam:PassRole'
+                - 'sns:Publish'
+                - 'autoscaling:*'
+                - 'tag:*'
+                - 'cloudwatch:*'
+                - 'elasticloadbalancing:*'
+                Effect: Allow
+                Resource: '*'
+
+  # Role for EC@ server that grants SSM permissions so it can be managed through Systems Manager & allows access to S3 for build artifacts
+  RoleEC2:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: EC2-CodeDeploy-Role
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      Path: "/"
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonEC2RoleforSSM
+      Policies:
+        - PolicyName: S3AccessforArtifact
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Action: 
+                - 's3:*'
+                Effect: Allow
+                Resource: '*'
+  
+  # CodeDeploy requires an instance profile to be attached to the EC2 instance
+  InstanceProfileEC2:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Path: "/"
+      Roles: 
+        - Ref: RoleEC2
+
+  # SG for server allowing single IP address access for SSH, HTTP, and HTTPS
+  WebServerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: SG for web servers.
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - CidrIp: 24.12.77.228/32
+          FromPort: 22
+          IpProtocol: tcp
+          ToPort: 22
+        - CidrIp: 24.12.77.228/32
+          FromPort: 443
+          IpProtocol: tcp
+          ToPort: 443
+        - CidrIp: 24.12.77.228/32
+          FromPort: 80
+          IpProtocol: tcp
+          ToPort: 80
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-WebServerSecurityGroup
+
+  Server:
+    Type: AWS::EC2::Instance
+    Metadata:
+      AWS::CloudFormation::Init:
+        config:
+          packages:
+            yum:
+              ruby
+          files:
+            /home/ec2-user-install:
+              source: 
+                Fn::Join:
+                - ''
+                - - https://aws-codedeploy-
+                  - Ref: AWS::Region
+                  - ".s3.amazonaws.com/latest/install"
+              mode: '000755'
+          commands:
+            00-install-agent:
+              command: ./install auto
+              cwd: /home/ec2-user
+            01-cfn-signal:
+              command: 
+                Fn::Join:
+                - ''
+                - - "/opt/aws/bin/cfn-signal -e 0 --stack "
+                  - Ref: AWS::StackName
+                  - " --resource Server --region "
+                  - Ref: AWS::Region
+    Properties:
+      IamInstanceProfile: !Ref InstanceProfileEC2
+      ImageId: !FindInMap [RegionMap, !Ref "AWS::Region", AMI]
+      InstanceType: t2.micro 
+      KeyName: !Ref Key                                   
+      NetworkInterfaces:
+        - AssociatePublicIpAddress: true
+          DeviceIndex: "0"
+          SubnetId:
+            Ref: SubnetPublicA
+          GroupSet:
+            - Ref: WebServerSecurityGroup
+      UserData:
+        'Fn::Base64': !Sub |
+          Fn::Join:
+          - ''
+          - - "#!/bin/bash\n"
+            - 'yum -y update
+
+              '
+            - 'yum -y install cfn-bootstrap
+
+              '
+            - "/opt/aws/bin/cfn-init -v"
+            - " --stack "
+            - Ref: AWS::StackName
+            - " --resource Server"
+            - " --region "
+            - Ref: AWS::Region
+            - "\n"
+      Tags:
+        - Key: test
+          Value: !Sub ${AWS::StackName}-WebServer1
+  
+  RepositoryCodeCommitSource:
+    Type: AWS::CodeCommit::Repository
+    Properties:
+      RepositoryDescription: CodeCommit repo used as source for CodePipeline.
+      RepositoryName: codepipeline-source
+
+  # Role for Codepipeline access to: S3 (Bucket for configuration files), Cloudformation (Deploy yaml file), IAM (Cloudformation role assumption), and SNS (Publush to topic)        
+  RoleCodePipeline:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+        - Action: ['sts:AssumeRole']
+          Effect: Allow
+          Principal:
+            Service: [codepipeline.amazonaws.com]
+        Version: '2012-10-17'
+      Path: /
+      Policies:
+        - PolicyName: CodePipelineAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Action:
+                - 's3:*'
+                - 'cloudformation:*'
+                - 'codecommit:*'
+                - 'codedeploy:*'
+                - 'iam:PassRole'
+                - 'sns:Publish'
+                Effect: Allow
+                Resource: '*'
+
+  RoleCodeDeploy:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+        - Action: ['sts:AssumeRole']
+          Effect: Allow
+          Principal:
+            Service: [codedeploy.amazonaws.com]
+        Version: '2012-10-17'
+      Path: /
+      Policies:
+        - PolicyName: CodePipelineAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Action:
+                - 's3:*'
+                - 'ec2:*'
+                - 'codecommit:*'
+                - 'codedeploy:*'
+                - 'iam:PassRole'
+                - 'sns:Publish'
+                - 'autoscaling:*'
+                - 'tag:*'
+                - 'cloudwatch:*'
+                - 'elasticloadbalancing:*'
+                Effect: Allow
+                Resource: '*'
+
+# Exports are referenced in the respository.yaml file
+Outputs:
+  BucketName:
+    Value: !Ref S3BucketDeploymentSource
+    Export:
+      Name: S3CodeDeployBucketName
+  RoleCDArn:
+    Value: !GetAtt RoleCodeDeploy.Arn
+    Export:
+      Name: RoleCodeDeployArn
+  RepoCPName:
+    Value: !GetAtt RepositoryCodeCommitSource.Name
+    Export:
+      Name: RepositoryName
+  RoleCPArn:
+    Value: !GetAtt RoleCodePipeline.Arn
+    Export:
+      Name: RoleCodePipelineArn
