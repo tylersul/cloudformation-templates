@@ -2,11 +2,13 @@
 
 AWSTemplateFormatVersion: '2010-09-09'
 
-Description: A CF template that creates a VPC for Resource Access Manager
+Description: A CF template that creates a pre-req infrastructure & resources for a CodePipeline instance.
 
 Parameters:
+
+  # S3 Bucket name w/ predefined default value.
   BucketName:
-    Description: Name of bucket to use as Code Pipline source.
+    Description: Name of bucket to use as Code Pipeline source.
     Type: String
     Default: ts-codepipeline-codecommit-bucket
     AllowedPattern: '[a-z0-9\-]*'
@@ -14,7 +16,10 @@ Parameters:
 
 Resources:
 
-  # Role for Codepipeline access to: S3 (Bucket for configuration files), Cloudformation (Deploy yaml file), IAM (Cloudformation role assumption), and SNS (Publush to topic)        
+  # Role for CodePipeline access to: S3 (Bucket for configuration files), 
+  #                                  Cloudformation (Deploy yaml file), 
+  #                                  IAM (Cloudformation role assumption),
+  #                                  and SNS (Publush to topic).     
   RoleCodePipeline:
     Type: AWS::IAM::Role
     Properties:

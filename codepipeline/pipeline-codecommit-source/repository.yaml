@@ -3,6 +3,7 @@ AWSTemplateFormatVersion: '2010-09-09'
 Description: A CF template that creates a pipeline with CodeCommit as the source.
 
 Parameters:
+  # Parameter is used to automatically seed the CodeCommit repository with code immediately upon creation.
   S3ObjectKey:
     Description: Source key for S3 pipeline stage.
     Type: String
@@ -10,6 +11,8 @@ Parameters:
 
 
 Resources:
+
+  # CodeCommit repository.  Seeded w/ a zip file from S3.  File must be placed manually before running stack, looking for automation capability.
   CodeCommitSourceRepo:
     Type: AWS::CodeCommit::Repository
     Properties:
@@ -20,6 +23,8 @@ Resources:
       RepositoryDescription: CodeCommit repo used as source for CodePipeline.
       RepositoryName: codepipeline-source
 
+  # CodePipeline that uses source code from CodeCommit to deploy a Cloudformation stack.
+  # Deploys the CF template to same account environment.
   Pipeline:
     Type: AWS::CodePipeline::Pipeline
     Properties:

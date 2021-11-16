@@ -186,68 +186,68 @@ Resources:
           Value: !Sub ${AWS::StackName}-WebServerSecurityGroup
 
   # EC2 Instance used as deployment target.  Config installs the CodeDeploy agent.
-  Server:
-    Type: AWS::EC2::Instance
-    Metadata:
-      AWS::CloudFormation::Init:
-        config:
-          packages:
-            yum:
-              ruby
-          files:
-            /home/ec2-user-install:
-              source: 
-                Fn::Join:
-                - ''
-                - - https://aws-codedeploy-
-                  - Ref: AWS::Region
-                  - ".s3.amazonaws.com/latest/install"
-              mode: '000755'
-          commands:
-            00-install-agent:
-              command: ./install auto
-              cwd: /home/ec2-user
-            01-cfn-signal:
-              command: 
-                Fn::Join:
-                - ''
-                - - "/opt/aws/bin/cfn-signal -e 0 --stack "
-                  - Ref: AWS::StackName
-                  - " --resource Server --region "
-                  - Ref: AWS::Region
-    Properties:
-      IamInstanceProfile: !Ref InstanceProfileEC2
-      ImageId: !FindInMap [RegionMap, !Ref "AWS::Region", AMI]
-      InstanceType: t2.micro 
-      KeyName: !Ref Key                                   
-      NetworkInterfaces:
-        - AssociatePublicIpAddress: true
-          DeviceIndex: "0"
-          SubnetId:
-            Ref: SubnetPublicA
-          GroupSet:
-            - Ref: WebServerSecurityGroup
-      UserData:
-        'Fn::Base64': !Sub |
-          Fn::Join:
-          - ''
-          - - "#!/bin/bash\n"
-            - 'yum -y update
+  # Server:
+  #   Type: AWS::EC2::Instance
+  #   Metadata:
+  #     AWS::CloudFormation::Init:
+  #       config:
+  #         packages:
+  #           yum:
+  #             ruby
+  #         files:
+  #           /home/ec2-user-install:
+  #             source: 
+  #               Fn::Join:
+  #               - ''
+  #               - - https://aws-codedeploy-
+  #                 - Ref: AWS::Region
+  #                 - ".s3.amazonaws.com/latest/install"
+  #             mode: '000755'
+  #         commands:
+  #           00-install-agent:
+  #             command: ./install auto
+  #             cwd: /home/ec2-user
+  #           01-cfn-signal:
+  #             command: 
+  #               Fn::Join:
+  #               - ''
+  #               - - "/opt/aws/bin/cfn-signal -e 0 --stack "
+  #                 - Ref: AWS::StackName
+  #                 - " --resource Server --region "
+  #                 - Ref: AWS::Region
+  #   Properties:
+  #     IamInstanceProfile: !Ref InstanceProfileEC2
+  #     ImageId: !FindInMap [RegionMap, !Ref "AWS::Region", AMI]
+  #     InstanceType: t2.micro 
+  #     KeyName: !Ref Key                                   
+  #     NetworkInterfaces:
+  #       - AssociatePublicIpAddress: true
+  #         DeviceIndex: "0"
+  #         SubnetId:
+  #           Ref: SubnetPublicA
+  #         GroupSet:
+  #           - Ref: WebServerSecurityGroup
+  #     UserData:
+  #       'Fn::Base64': !Sub |
+  #         Fn::Join:
+  #         - ''
+  #         - - "#!/bin/bash\n"
+  #           - 'yum -y update
 
-              '
-            - 'yum -y install cfn-bootstrap
+  #             '
+  #           - 'yum -y install cfn-bootstrap
 
-              '
-            - "/opt/aws/bin/cfn-init -v"
-            - " --stack "
-            - Ref: AWS::StackName
-            - " --resource Server"
-            - " --region "
-            - Ref: AWS::Region
-            - "\n"
-      Tags:
-        - Key: deployment-target
-          Value: !Sub ${AWS::StackName}-WebServer1
+  #             '
+  #           - "/opt/aws/bin/cfn-init -v"
+  #           - " --stack "
+  #           - Ref: AWS::StackName
+  #           - " --resource Server"
+  #           - " --region "
+  #           - Ref: AWS::Region
+  #           - "\n"
+  #     Tags:
+  #       - Key: deployment-target
+  #         Value: !Sub ${AWS::StackName}-WebServer1
   
   # Code repository in CodeCommit used as source for CodePipeline pipeline.
   RepositoryCodeCommitSource:
