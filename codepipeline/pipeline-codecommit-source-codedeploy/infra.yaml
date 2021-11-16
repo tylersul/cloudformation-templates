@@ -246,7 +246,7 @@ Resources:
             - Ref: AWS::Region
             - "\n"
       Tags:
-        - Key: test
+        - Key: deployment-target
           Value: !Sub ${AWS::StackName}-WebServer1
   
   # Code repository in CodeCommit used as source for CodePipeline pipeline.
