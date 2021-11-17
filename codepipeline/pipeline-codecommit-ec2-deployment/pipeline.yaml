@@ -27,7 +27,7 @@ Resources:
           Type: KEY_ONLY
       ServiceRoleArn: !ImportValue RoleCodeDeployArn
 
-  # Role that is assumable by the EventBridge service with permissions to 
+  # Role that is assumable by the EventBridge service with permissions to trigger Codepipeline.
   RoleEventBridge:
     Type: AWS::IAM::Role
     Properties:
@@ -49,6 +49,7 @@ Resources:
                 Effect: Allow
                 Resource: '*'
 
+  # Eventbride Rule used to trigger the Pipeline in this template when there's a change to the CodeCommit repository.
   EventCodeCommitRule:
     Type: AWS::Events::Rule
     Properties:
