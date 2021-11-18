@@ -1,0 +1,231 @@
+AWSTemplateFormatVersion: '2010-09-09'
+
+Description: A CF template that creates a CodePipeline CI/CD pipeline that deploys serverless code updates.
+
+Parameters:
+
+  # Parameter for naming S3 Bucket.
+  BucketName:
+    Description: Name of bucket to use as Code Pipeline source.
+    Type: String
+    Default: ts-codedeploy-bucket
+    AllowedPattern: '[a-z0-9\-]*'
+    ConstraintDescription: Lowercase letters, numbers, and hyphens 
+
+Resources:
+
+  RoleExecutionLambda:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: 
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Path: "/"
+      Policies:
+        - PolicyName: CodePipelineAccess
+          PolicyDocument: 
+            Version: '2012-10-17'
+            Statement: 
+              - Action: 
+                - 'cloudwatch:*'
+                Effect: Allow
+                Resource: '*'
+      RoleName: LambdaExecutionRole
+
+  LambdaRandom:
+    Type: AWS::Lambda::Function
+    Properties:
+      Description: Test Lambda function.
+      FunctionName: RandomLambdaFunction
+      Handler: index.handler
+      Role: !GetAtt RoleExecutionLambda.Arn
+      Runtime: nodejs12.x
+      Code:
+        ZipFile:  |
+          console.log('Loading function');
+
+          exports.handler = async (event) => {
+              let min = 0;
+              let max = 10;
+              let responseCode = 200;
+              
+              let generatedNumber = Math.floor(Math.random() * max) + min;
+              
+              let responseBody = {
+                  message: generatedNumber,
+                  input: event
+              }
+              
+              let response = {
+                  statusCode: responseCode,
+                  headers: {
+                      "x-custom-header" : "my custom header value"
+                  },
+                  body: JSON.stringify(responseBody)
+              }
+              
+              console.log("response: " + JSON.stringify(response));
+              return response;
+              
+          };
+
+  VersionLambdaRandom:
+    Type: AWS::Lambda::Version
+    Properties:
+      Description: Version testing.
+      FunctionName: !GetAtt LambdaRandom.Arn
+
+  AliasLambdaRandom:
+    Type: AWS::Lambda::Alias
+    Properties:
+      FunctionName: !GetAtt LambdaRandom.Arn
+      FunctionVersion: !GetAtt VersionLambdaRandom.Version
+      Name: TestDeploymentAlias
+
+  # Code repository in CodeCommit used as source for CodePipeline pipeline.
+  RepositoryCodeCommitSource:
+    Type: AWS::CodeCommit::Repository
+    Properties:
+      RepositoryDescription: CodeCommit repo used as source for CodePipeline.
+      RepositoryName: codepipeline-lambda-deployment-source
+
+  # # Role for Codepipeline access to: S3 (Bucket for configuration files), IAM (Role assumption), Lambda (update function code).        
+  RoleCodePipeline:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+        - Action: ['sts:AssumeRole']
+          Effect: Allow
+          Principal:
+            Service: [codepipeline.amazonaws.com]
+        Version: '2012-10-17'
+      Path: /
+      Policies:
+        - PolicyName: CodePipelinePermissions
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Action:
+                - 'cloudformation:*'
+                - 'codecommit:*'
+                - 'codedeploy:*'
+                - 'iam:PassRole'
+                - 'lambda:*'
+                - 's3:*'
+                - 'sns:Publish'
+                Effect: Allow
+                Resource: '*'
+
+  # # S3 Bucket used to house CodePipeline artifacts used in a deployment.  In this case, it holds files stored in CodeCommit used in build.
+  # S3BucketDeploymentSource:
+  #   Type: AWS::S3::Bucket
+  #   Properties: 
+  #     BucketName: !Ref BucketName
+
+  # Role used by CodeDeploy during a deployment.
+  RoleCodeDeploy:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+        - Action: ['sts:AssumeRole']
+          Effect: Allow
+          Principal:
+            Service: [codedeploy.amazonaws.com]
+        Version: '2012-10-17'
+      Path: /
+      Policies:
+        - PolicyName: CodePipelineAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Action:
+                - 's3:*'
+                - 'ec2:*'
+                - 'codecommit:*'
+                - 'iam:PassRole'
+                - 'sns:Publish'
+                - 'autoscaling:*'
+                - 'tag:*'
+                - 'cloudwatch:*'
+                - 'elasticloadbalancing:*'
+                - 'lambda:*'
+                Effect: Allow
+                Resource: '*'
+      RoleName: CodeDeployExecutionRole
+
+  # Creates an Application in CodeDeploy.  Applications in CD act as container to ensure correct combo of revision, config, and deployment group is used.
+  ApplicationCodeDeployLambda:
+    Type: AWS::CodeDeploy::Application
+    Properties:
+      ApplicationName: ExampleLambdaApp
+      ComputePlatform: Lambda
+
+  # Deployment Group that is targeted during an ExampleLinuxApp application deployment. Specifies EC2 instances that app revisions are deployed to.
+  DeploymentGroup:
+    Type: AWS::CodeDeploy::DeploymentGroup
+    Properties:
+      ApplicationName: !Ref ApplicationCodeDeployLambda
+      AutoRollbackConfiguration: 
+        Enabled: true 
+        Events:
+          - DEPLOYMENT_FAILURE
+      DeploymentConfigName: CodeDeployDefault.LambdaAllAtOnce
+      DeploymentGroupName: LambdaDeploymentGroup
+      ServiceRoleArn: !GetAtt RoleCodeDeploy.Arn 
+
+  # # Pipeline with two stages: a source stage and a deploy stage.
+  # # Source Stage: Creates & prepares an artifact from CodeCommit containing deployment files.  Artifact is also then stored in the S3 bucket from infra temp.
+  # # Deployment Stage: utilizes artifact from Source stage to create a deployment in CodeDeploy targeting an EC2 instance.
+  # Pipeline:
+  #   Type: AWS::CodePipeline::Pipeline
+  #   Properties:
+  #     ArtifactStore:
+  #       Type: S3
+  #       Location: !ImportValue S3CodeDeployBucketName
+  #     Name: pipeline-lambda-deployment
+  #     RoleArn: !ImportValue RoleCodePipelineArn
+  #     Stages: 
+  #       -
+  #         Name: Source
+  #         Actions: 
+  #           -
+  #             Name: SourceStage
+  #             ActionTypeId:
+  #               Category: Source
+  #               Owner: AWS
+  #               Version: '1'
+  #               Provider: CodeCommit
+  #             OutputArtifacts:
+  #               - Name: SourceArtifact
+  #             Configuration:
+  #               BranchName: main
+  #               RepositoryName: !ImportValue RepositoryName
+  #       -
+  #         Name: Deploy
+  #         Actions:  
+  #           -
+  #             Name: DeployStage
+  #             InputArtifacts:
+  #               - Name: SourceArtifact
+  #             ActionTypeId:
+  #               Category: Deploy
+  #               Owner: AWS
+  #               Version: '1'
+  #               Provider: CodeDeploy
+  #             Configuration:
+  #               ApplicationName: ExampleLinuxApp
+  #               DeploymentGroupName: LinuxDeploymentGroup
+  #             Region: us-east-1
+
+  # Exports are referenced in the respository.yaml file
+Outputs:
+  VersionNumber:
+    Value: !Ref VersionLambdaRandom
+    Export:
+      Name: LambdaVersion

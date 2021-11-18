@@ -1,0 +1,11 @@
+version: 0.0
+
+resources:
+  - LambdaRandom
+    type: "AWS::Lambda::Function"
+    properties:
+      name: RandomLambdaFunction
+      alias: TestDeploymentAlias
+      currentversion: "3"
+      newversion: "4"
+
