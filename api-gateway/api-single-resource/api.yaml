@@ -7,7 +7,7 @@ AWSTemplateFormatVersion: '2010-09-09'
 Description: A CF template that creates a VPC for Resource Access Manager
 
 Resources:
-  
+  # Public facing REST API Gateway.
   ApiGatewayRest:
     Type: AWS::ApiGateway::RestApi
     Properties:
@@ -17,6 +17,7 @@ Resources:
           - REGIONAL
       Name: TestCFApi
 
+  # Resource for the REST API Gateway.  Defines a path for a URL.  In this case, /random path is created.
   ResourceApiGatewayRandom:
     Type: AWS::ApiGateway::Resource
     Properties:
@@ -26,6 +27,7 @@ Resources:
       PathPart: random
       RestApiId: !Ref ApiGatewayRest
 
+  # Method - GET.  Adds the GET method options to the /random resource path.  Integrated with the Random Lambda function.
   MethodApiGatewayRandom:
     Type: AWS::ApiGateway::Method
     Properties:
@@ -34,11 +36,12 @@ Resources:
       Integration:  
         IntegrationHttpMethod: POST
         Type: AWS_PROXY
-        Credentials: !GetAtt IamRoleApiGateway.Arn
+        Credentials: !GetAtt RoleApiGateway.Arn
         Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LambdaRandom.Arn}/invocations'
       ResourceId: !Ref ResourceApiGatewayRandom
       RestApiId: !Ref ApiGatewayRest
 
+  # Deploys the REST API to a stage so that clients can call the API over the internet.  The stage acts as an environment.
   ApiGatewayDeployment:
     Type: AWS::ApiGateway::Deployment
     DependsOn: MethodApiGatewayRandom
@@ -46,6 +49,7 @@ Resources:
       Description: Lambda API Deployment
       RestApiId: !Ref ApiGatewayRest
 
+  # Creates the Stage that the API gateway gets deployed to.
   ApiGatewayStage:
     Type: AWS::ApiGateway::Stage
     Properties:
@@ -54,17 +58,16 @@ Resources:
       RestApiId: !Ref ApiGatewayRest
       StageName: 'Dev'
 
-  IamRoleApiGateway:
+  # Role that gives API gateway access to all operations for the Random Lambda.
+  RoleApiGateway:
     Type: AWS::IAM::Role
     Properties:
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
         Statement:
-          - Sid: ''
-            Effect: 'Allow'
+          - Effect: 'Allow'
             Principal:
-              Service:
-                - 'apigateway.amazonaws.com'
+              Service: [apigateway.amazonaws.com]
             Action:
               - 'sts:AssumeRole'
       Path: '/'
@@ -76,7 +79,33 @@ Resources:
               - Effect: 'Allow'
                 Action: 'lambda:*'
                 Resource: !GetAtt LambdaRandom.Arn
+      RoleName: ApiGatewayLambdaExecutionRole
 
+  # Role for Lambda to allow it to publish logs.
+  LambdaRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: [lambda.amazonaws.com]
+            Action:
+              - 'sts:AssumeRole'
+      Path: /
+      Policies:
+        - PolicyName: LambdaPermissions
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:*
+                Resource: '*' 
+      RoleName: LambdaRole 
+    
+  # Lambda function (Random) that returns a random number 1-10.
   LambdaRandom:
     Type: AWS::Lambda::Function
     Properties:
@@ -113,7 +142,8 @@ Resources:
               return response;
               
           };
-          
+
+  # Lambda permission that grants API Gateway the ability to invoke the function at a specific path.        
   PermissionLambdaRandom:
     Type: AWS::Lambda::Permission
     Properties:
