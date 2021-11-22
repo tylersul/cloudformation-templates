@@ -1,10 +1,9 @@
-# Template: Creates a REST API gateway integrated w/ a lambda function
-# Example here is inline code defined within template for Lambda
+# Template: Creates a REST API gateway integrated w/ a lambda function using inline code.
 
 # CLI CALL - aws cloudformation create-stack --stack-name <StackName> --template-body file://<FileName> --capabilities CAPABILITY_IAM
 # In some cases, must explicitly acknowledge that your stack template contains certain capabilities 
 AWSTemplateFormatVersion: '2010-09-09'
-Description: A CF template that creates a VPC for Resource Access Manager
+Description: A CF template that creates an API Gateway with a single resource integrated with a Lambda function backend.
 
 Resources:
   # Public facing REST API Gateway.
