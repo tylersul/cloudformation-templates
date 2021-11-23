@@ -2,8 +2,10 @@
 
 # CLI CALL - aws cloudformation create-stack --stack-name <StackName> --template-body file://<FileName> --capabilities CAPABILITY_IAM
 # In some cases, must explicitly acknowledge that your stack template contains certain capabilities 
+
 AWSTemplateFormatVersion: '2010-09-09'
-Description: A CF template that creates an API Gateway with a single resource integrated with a Lambda function backend and DynamoDB table.
+
+Description: A CF template that creates an API Gateway with a mutliple resources integrated with a Lambda function backend and DynamoDB table.
 
 Resources:
   
@@ -41,7 +43,7 @@ Resources:
       ResourceId: !Ref ResourceApiGatewayHealth
       RestApiId: !Ref ApiGatewayRest
 
-  # Resource 'products' for the REST API Gateway.
+  # Resource 'products' for the REST API Gateway. This path is used when querying for ALL products in the product-inventory DynamoDB table.
   ResourceApiGatewayProducts:
     Type: AWS::ApiGateway::Resource
     Properties:
@@ -51,7 +53,7 @@ Resources:
       PathPart: products
       RestApiId: !Ref ApiGatewayRest
 
-  # Method - GET.  Adds the GET method options to the /health resource path.  Integrated with the CRUD Lambda function.
+  # Method - GET.  Adds the GET method options to the /health resource path. 
   MethodApiGatewayProducts:
     Type: AWS::ApiGateway::Method
     Properties:
@@ -65,7 +67,7 @@ Resources:
       ResourceId: !Ref ResourceApiGatewayProducts
       RestApiId: !Ref ApiGatewayRest
 
-  # Resource 'products' for the REST API Gateway.
+  # Resource 'product' for the REST API Gateway.  This path is used when performing operations on specific products in the product-inventory table.
   ResourceApiGatewayProduct:
     Type: AWS::ApiGateway::Resource
     Properties:
@@ -75,7 +77,7 @@ Resources:
       PathPart: product
       RestApiId: !Ref ApiGatewayRest
 
-  # Method - GET.  Adds the GET method options to the /health resource path.  Integrated with the CRUD Lambda function.
+  # Method - GET.  Adds the GET method options to the /product resource path. 
   MethodApiGatewayProductGet:
     Type: AWS::ApiGateway::Method
     Properties:
@@ -139,15 +141,16 @@ Resources:
       Description: Lambda API Deployment
       RestApiId: !Ref ApiGatewayRest
 
-  # Creates the Stage that the API gateway gets deployed to.
+  # Creates the Stage that the API gateway gets deployed to, this stage is 'dev'.
   ApiGatewayStage:
     Type: AWS::ApiGateway::Stage
     Properties:
       DeploymentId: !Ref ApiGatewayDeployment
       Description: Lambda API Stage v0
       RestApiId: !Ref ApiGatewayRest
-      StageName: 'Dev'
+      StageName: 'dev'
 
+  # DynamoDB table for product inventory.  This partition key is productId.
   DynamoTableProducts:
     Type: AWS::DynamoDB::Table
     Properties: 
@@ -160,7 +163,7 @@ Resources:
           KeyType: HASH
       TableName: product-inventory
 
-  # Role that gives API gateway access to all operations for the Random Lambda.
+  # Role that gives API gateway access to all operations for the CRUD Lambda.
   RoleApiGateway:
     Type: AWS::IAM::Role
     Properties:
@@ -183,7 +186,7 @@ Resources:
                 Resource: !GetAtt LambdaCrud.Arn
       RoleName: ApiGatewayLambdaExecutionRole
 
-  # Role for Lambda to allow it to publish logs during execution.
+  # Role for Lambda to allow it to publish logs during execution and perform operations on the dynamo table.
   LambdaRole:
     Type: 'AWS::IAM::Role'
     Properties:
@@ -213,7 +216,7 @@ Resources:
     Type: AWS::Lambda::Function
     Properties:
       Description: Lambda function integrated w/ API for CRUD operations.
-      FunctionName: RandomLambda
+      FunctionName: CRUDLambda
       Handler: index.handler
       Role: !GetAtt LambdaRole.Arn
       Runtime: nodejs12.x
@@ -237,4 +240,4 @@ Resources:
           - Ref: AWS::AccountId
           - ":"
           - Ref: ApiGatewayRest
-          - "/*/GET/random"
+          - "/*/GET/product"
