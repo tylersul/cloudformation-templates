@@ -127,7 +127,7 @@ const saveProduct = async (requestBody) => {
       }
       return buildResponse(200, body);
     }, (error) => {
-      console.error('Do your custom error handling here. I am just gonna log it: ', error);
+      console.error('Error message: ', error);
     })
   }
   
