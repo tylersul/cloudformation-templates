@@ -46,6 +46,7 @@ E.g. /product?productId=1001
 
 Response example:
 
+```json
 {
     "inventory": 100001,
     "price": 150,
@@ -53,7 +54,7 @@ Response example:
     "productId": "1001",
     "productName": "product"
 }
-
+```
 
 METHOD - POST
 
@@ -62,6 +63,7 @@ Request body with the productId and any other attributes associated with the ite
 
 Request example:
 
+```json
 {
     "productId": "1001",
     "price": 150,
@@ -69,9 +71,11 @@ Request example:
     "color": "red",
     "inventory": 1000
 }
+```
 
 Response example:
 
+```json
 {
     "Operation": "SAVE",
     "Message": "SUCCESS",
@@ -83,6 +87,7 @@ Response example:
         "inventory": 1000
     }
 }
+```
 
 METHOD - PATCH
 
@@ -91,14 +96,16 @@ Request body with the productId, an updateKey (the attribute that will be update
 
 Request example:
 
+```json
 {
     "productId": "1001",
     "updateKey": "inventory",
     "updateValue": 100002
 }
-
+```
 Response example:
 
+```json
 {
     "Operation": "UPDATE",
     "Message": "SUCCESS",
@@ -108,7 +115,7 @@ Response example:
         }
     }
 }
-
+```
 
 METHOD - DELETE
 
@@ -118,6 +125,7 @@ E.g. /product?productId=1001
 
 Response example:
 
+```json
 {
     "Operation": "DELETE",
     "Message": "SUCCESS",
@@ -131,3 +139,4 @@ Response example:
         }
     }
 }
+```
