@@ -39,9 +39,12 @@ exports.handler = async (event) => {
         // If the httpMethod value in the event object is GET & the path value is the preset productsPath value (/products), execute the getProducts function
         case event.httpMethod === 'GET' && event.path === productsPath:
             response = await getProducts();
+            break;
         // If the httpMethod value in the event object is POST & the path value is the preset productPath value (/product),
         //      execute the saveProduct function with the body value from the event object
         case event.httpMethod === 'POST' && event.path === productPath:
+            console.log(event.httpMethod)
+            console.log('made it to saving products path')
             response = await saveProduct(JSON.parse(event.body));
             break;
         // If the httpMethod value in the event object is PATCH & the path value is the preset productPath value (/product),
