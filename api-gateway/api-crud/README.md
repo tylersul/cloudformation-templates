@@ -12,17 +12,18 @@ API Gateway integrated with a Lambda function and DynamoDB Table backend that de
 ### /health
 Health check path to confirm function of the API.
 
-Method - GET 
+**Method - GET**
 
 Returns 200 HTTP response code to confirm functionality is working as expected.
 
 ### /products
-METHOD - GET
+**METHOD - GET**
 
 Returns all products from the product-inventory Dynamo table.
 
 Response example:
 
+```json
 {
     "products": [
         {
@@ -34,11 +35,12 @@ Response example:
         }
     ]
 }
+```
 
 ### /product
 Various operations on single products.
 
-METHOD - GET
+**METHOD - GET**
 
 Required Parameters:
 Query parameter with the product id, productId.
@@ -56,7 +58,7 @@ Response example:
 }
 ```
 
-METHOD - POST
+**METHOD - POST**
 
 Required parameters:
 Request body with the productId and any other attributes associated with the item.
@@ -89,7 +91,7 @@ Response example:
 }
 ```
 
-METHOD - PATCH
+**METHOD - PATCH**
 
 Required parameters:
 Request body with the productId, an updateKey (the attribute that will be updated), and the updateValue.
@@ -117,7 +119,7 @@ Response example:
 }
 ```
 
-METHOD - DELETE
+**METHOD - DELETE**
 
 Required parameters:
 Query parameter with the product id, productId.
