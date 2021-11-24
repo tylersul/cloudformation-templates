@@ -12,7 +12,7 @@ API Gateway integrated with a Lambda function and DynamoDB Table backend that de
 ### /health
 Health check path to confirm function of the API.
 
-**Method - GET**
+**METHOD - GET**
 
 Returns 200 HTTP response code to confirm functionality is working as expected.
 
