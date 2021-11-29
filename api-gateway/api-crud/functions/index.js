@@ -43,8 +43,8 @@ exports.handler = async (event) => {
         // If the httpMethod value in the event object is POST & the path value is the preset productPath value (/product),
         //      execute the saveProduct function with the body value from the event object
         case event.httpMethod === 'POST' && event.path === productPath:
-            console.log(event.httpMethod)
-            console.log('made it to saving products path')
+            console.log("non-json: ", event.body)
+            console.log("json: ", JSON.parse(event.body))
             response = await saveProduct(JSON.parse(event.body));
             break;
         // If the httpMethod value in the event object is PATCH & the path value is the preset productPath value (/product),
@@ -65,15 +65,20 @@ exports.handler = async (event) => {
 
 const buildResponse = (statusCode, body) => {
     return {
+        // 200 OK HTTP status 
         statusCode: statusCode,
+        // Parse the result into JSON.  This is a response header that declares the type of the resource.
         headers: {
             'Content-Type': 'application/json'
         },
+        // Converts JS object to a JSON string
         body: JSON.stringify(body)
     }
 }
 
 const getProduct = async (productId) => {
+    // Parameters for Dynamo table and the productId to reference
+    // productId is passed thourgh in the request 
     const params = {
         TableName: dynamodbTableName,
         Key: {
@@ -84,17 +89,21 @@ const getProduct = async (productId) => {
     return await dynamodb.get(params).promise().then((response) => {
         return buildResponse(200, response.Item);
     }, (error) => {
-        console.error('Error: ', error);
+        // Console.error writes to stderr, while console.log rights to stdout
+        console.error('Error getting the product information: ', error);
     });
 }
 
 const getProducts = async () => {
+    // Only parameter is the DDB Table name
     const params = {
         TableName: dynamodbTableName
     }
 
+    // Reference scanDynamoRecords function
     const allProducts = await scanDynamoRecords(params, []);
     
+    // All products found in a scan of the DDB table
     const body = {
         products: allProducts
     }
@@ -104,24 +113,35 @@ const getProducts = async () => {
 
 const scanDynamoRecords = async (scanParams, itemArray) => {
     try {
+        // JS SDK Scan operations: https://docs.aws.amazon.com/AWSJavaScriptSDK/latest/AWS/DynamoDB.html#scan-property
         const dynamoData = await dynamodb.scan(scanParams).promise();
+        
+        // Adds returned itmes into itemArry
         itemArray = itemArray.concat(dynamoData.Items);
         
-        if (dynamoData.LastEvaluateKey) {
+        // If total # of scanned items exceeds max of 1MB, scan stops and results returned to user as a LastEvaluatedKey value 
+        // Continues scan in subsequent operation
+        if (dynamoData.LastEvaluatedKey) {
             scanParams.ExclusiveStartKey = dynamoData.LastEvaluatedKey;
             return await scanDynamoRecords(scanParams, itemArray);
         }
+
+        // Returns array with all items from the product-inventory table
         return itemArray;
+
     } catch(error) {
-        console.error('Error: ', error);
+        console.error('Error getting the products in the table: ', error);
     }
 }
 
 const saveProduct = async (requestBody) => {
+    // Two params: DDB table and the item info, which is provided from the required requestBody input
     const params = {
       TableName: dynamodbTableName,
       Item: requestBody
     }
+
+    // PUT operations and response returned
     return await dynamodb.put(params).promise().then(() => {
       const body = {
         Operation: 'SAVE',
