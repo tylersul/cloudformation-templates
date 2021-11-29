@@ -111,7 +111,7 @@ Resources:
       Description: Test Lambda function integrated w/ API.
       FunctionName: RandomLambda
       Handler: index.handler
-      Role: arn:aws:iam::938884152055:role/service-role/TestFunciton-role-2p33j9j7
+      Role: !GetAtt LambdaRole.Arn
       Runtime: nodejs12.x
       Code:
         ZipFile:  |
@@ -134,10 +134,12 @@ Resources:
                   headers: {
                       "x-custom-header" : "my custom header value"
                   },
-                  body: JSON.stringify(responseBody)
+                  body: responseBody.message
               }
               
-              console.log("response: " + JSON.stringify(response));
+              console.log("Entire event: " + JSON.stringify(event));
+              console.log("Event body: " + JSON.stringify(event.body));
+              console.log("Random number generated: ", responseBody.message);
               return response;
               
           };
