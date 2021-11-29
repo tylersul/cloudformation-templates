@@ -1,3 +1,2 @@
 # CloudFormation Templates for AWS Services
-
-## Templates demoing different AWS services and their capabilities
+Templates demoing different AWS services and their capabilities.
