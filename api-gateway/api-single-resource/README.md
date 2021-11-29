@@ -2,6 +2,9 @@
 - Template defines an API gateway to demonstrate the use of Resources and Methods.
 - Integrated with a backend Lambda function.
 
+&nbsp;
+&nbsp;
+&nbsp;
 
 ## API Gateway
 ### /random
