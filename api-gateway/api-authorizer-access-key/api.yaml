@@ -1,0 +1,275 @@
+# Template: Creates a REST API gateway integrated w/ a backend lambda function and DynamoDB table.
+
+# CLI CALL - aws cloudformation create-stack --stack-name <StackName> --template-body file://<FileName> --capabilities CAPABILITY_IAM
+# In some cases, must explicitly acknowledge that your stack template contains certain capabilities 
+
+AWSTemplateFormatVersion: '2010-09-09'
+
+Description: A CF template that creates an API Gateway with a mutliple resources integrated with a Lambda function backend and DynamoDB table.
+
+Resources:
+  
+  # Public facing REST API Gateway.
+  ApiGatewayRest:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      Description: API integration w/ Lambda.
+      EndpointConfiguration: 
+        Types: 
+          - REGIONAL
+      Name: ApiCRUD
+
+  # API Key for authenticated requests
+  ApiKeyAuthentication:
+    Type: AWS::ApiGateway::ApiKey
+    Properties:
+      Enabled: TRUE
+      Name: customer-key
+
+  # Usage plan for access keys
+  UsagePlanAccessKeyUser:
+    Type: AWS::ApiGateway::UsagePlan
+    Properties:
+      ApiStages:
+        - ApiId: !Ref ApiGatewayRest
+          Stage: dev
+      Quota:
+        Limit: 5000
+        Period: MONTH
+      Throttle:
+        BurstLimit: 200
+        RateLimit: 100
+      UsagePlanName: ApiKeyUsagePlan
+
+  # Associate API Key with Usage Plan
+  UsagePlanKeyforApi:
+    Type: AWS::ApiGateway::UsagePlanKey
+    Properties:
+      KeyId: !Ref ApiKeyAuthentication
+      KeyType: API_KEY
+      UsagePlanId: !Ref UsagePlanAccessKeyUser
+
+  # Resource for the REST API Gateway.  Defines a path for a URL.  In this case, /health path is created for health checks.
+  ResourceApiGatewayHealth:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      ParentId: !GetAtt
+        - ApiGatewayRest
+        - RootResourceId
+      PathPart: health
+      RestApiId: !Ref ApiGatewayRest
+
+  # Method - GET.  Adds the GET method options to the /health resource path.  Integrated with the CRUD Lambda function.
+  MethodApiGatewayHealth:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      AuthorizationType: NONE
+      HttpMethod: GET
+      Integration:  
+        IntegrationHttpMethod: POST
+        Type: AWS_PROXY
+        Credentials: !GetAtt RoleApiGateway.Arn
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LambdaCrud.Arn}/invocations'
+      ResourceId: !Ref ResourceApiGatewayHealth
+      RestApiId: !Ref ApiGatewayRest
+
+  # Resource 'products' for the REST API Gateway. This path is used when querying for ALL products in the product-inventory DynamoDB table.
+  ResourceApiGatewayProducts:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      ParentId: !GetAtt
+        - ApiGatewayRest
+        - RootResourceId
+      PathPart: products
+      RestApiId: !Ref ApiGatewayRest
+
+  # Method - GET.  Adds the GET method options to the /health resource path. 
+  MethodApiGatewayProducts:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      ApiKeyRequired: TRUE
+      AuthorizationType: NONE
+      HttpMethod: GET
+      Integration:  
+        IntegrationHttpMethod: POST
+        Type: AWS_PROXY
+        Credentials: !GetAtt RoleApiGateway.Arn
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LambdaCrud.Arn}/invocations'
+      ResourceId: !Ref ResourceApiGatewayProducts
+      RestApiId: !Ref ApiGatewayRest
+
+  # Resource 'product' for the REST API Gateway.  This path is used when performing operations on specific products in the product-inventory table.
+  ResourceApiGatewayProduct:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      ParentId: !GetAtt
+        - ApiGatewayRest
+        - RootResourceId
+      PathPart: product
+      RestApiId: !Ref ApiGatewayRest
+
+  # Method - GET.  Adds the GET method options to the /product resource path. 
+  MethodApiGatewayProductGet:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      AuthorizationType: NONE
+      HttpMethod: GET
+      Integration:  
+        IntegrationHttpMethod: POST
+        Type: AWS_PROXY
+        Credentials: !GetAtt RoleApiGateway.Arn
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LambdaCrud.Arn}/invocations'
+      ResourceId: !Ref ResourceApiGatewayProduct
+      RestApiId: !Ref ApiGatewayRest
+
+  # Method - GET.  Adds the GET method options to the /health resource path.  Integrated with the CRUD Lambda function.
+  MethodApiGatewayProductPost:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      ApiKeyRequired: TRUE
+      AuthorizationType: NONE
+      HttpMethod: POST
+      Integration:  
+        IntegrationHttpMethod: POST
+        Type: AWS_PROXY
+        Credentials: !GetAtt RoleApiGateway.Arn
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LambdaCrud.Arn}/invocations'
+      ResourceId: !Ref ResourceApiGatewayProduct
+      RestApiId: !Ref ApiGatewayRest
+
+  # Method - GET.  Adds the GET method options to the /health resource path.  Integrated with the CRUD Lambda function.
+  MethodApiGatewayProductPatch:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      AuthorizationType: NONE
+      HttpMethod: PATCH
+      Integration:  
+        IntegrationHttpMethod: POST
+        Type: AWS_PROXY
+        Credentials: !GetAtt RoleApiGateway.Arn
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LambdaCrud.Arn}/invocations'
+      ResourceId: !Ref ResourceApiGatewayProduct
+      RestApiId: !Ref ApiGatewayRest
+
+  # Method - GET.  Adds the GET method options to the /health resource path.  Integrated with the CRUD Lambda function.
+  MethodApiGatewayProductDelete:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      AuthorizationType: NONE
+      HttpMethod: DELETE
+      Integration:  
+        IntegrationHttpMethod: POST
+        Type: AWS_PROXY
+        Credentials: !GetAtt RoleApiGateway.Arn
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LambdaCrud.Arn}/invocations'
+      ResourceId: !Ref ResourceApiGatewayProduct
+      RestApiId: !Ref ApiGatewayRest
+
+  # Deploys the REST API to a stage so that clients can call the API over the internet.  The stage acts as an environment.
+  ApiGatewayDeployment:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn: MethodApiGatewayProductDelete
+    Properties:
+      Description: Lambda API Deployment
+      RestApiId: !Ref ApiGatewayRest
+
+  # Creates the Stage that the API gateway gets deployed to, this stage is 'dev'.
+  ApiGatewayStage:
+    Type: AWS::ApiGateway::Stage
+    Properties:
+      DeploymentId: !Ref ApiGatewayDeployment
+      Description: Lambda API Stage v0
+      RestApiId: !Ref ApiGatewayRest
+      StageName: 'dev'
+
+  # DynamoDB table for product inventory.  This partition key is productId.
+  DynamoTableProducts:
+    Type: AWS::DynamoDB::Table
+    Properties: 
+      AttributeDefinitions:
+        - AttributeName: productId
+          AttributeType: 'S'
+      BillingMode: PAY_PER_REQUEST
+      KeySchema:
+        - AttributeName: productId
+          KeyType: HASH
+      TableName: product-inventory
+
+  # Role that gives API gateway access to all operations for the CRUD Lambda.
+  RoleApiGateway:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: 'Allow'
+            Principal:
+              Service: [apigateway.amazonaws.com]
+            Action:
+              - 'sts:AssumeRole'
+      Path: '/'
+      Policies:
+        - PolicyName: LambdaAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: 'Allow'
+                Action: 'lambda:*'
+                Resource: !GetAtt LambdaCrud.Arn
+      RoleName: ApiGatewayLambdaExecutionRole
+
+  # Role for Lambda to allow it to publish logs during execution and perform operations on the dynamo table.
+  LambdaRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: [lambda.amazonaws.com]
+            Action:
+              - 'sts:AssumeRole'
+      Path: /
+      Policies:
+        - PolicyName: LambdaPermissions
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:*
+                  - logs:*
+                Resource: '*' 
+      RoleName: LambdaRole 
+    
+  # Lambda function (Random) that returns a random number 1-10.
+  LambdaCrud:
+    Type: AWS::Lambda::Function
+    Properties:
+      Description: Lambda function integrated w/ API for CRUD operations.
+      FunctionName: CRUDLambda
+      Handler: index.handler
+      Role: !GetAtt LambdaRole.Arn
+      Runtime: nodejs12.x
+      Code:         
+        ZipFile:  |
+          console.log('Loading function');
+
+  # Lambda permission that grants API Gateway the ability to invoke the function at a specific path.        
+  PermissionLambdaRandom:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:invokeFunction
+      FunctionName: !Ref LambdaCrud
+      Principal: apigateway.amazonaws.com
+      SourceArn:
+        Fn::Join:
+        - ''
+        - - 'arn:aws:execute-api:'
+          - Ref: AWS::Region
+          - ":"
+          - Ref: AWS::AccountId
+          - ":"
+          - Ref: ApiGatewayRest
+          - "/*/GET/product"
