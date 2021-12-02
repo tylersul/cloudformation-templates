@@ -1,0 +1,222 @@
+# Template: Creates a REST API gateway integrated with Cognito User pools to authorize access to the API.
+
+AWSTemplateFormatVersion: '2010-09-09'
+
+Description: A CF template that creates an API Gateway with Cognito User Pool authorizer.
+
+Resources:
+  
+  # Public facing REST API Gateway.
+  ApiGatewayRest:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      Description: API gateway authorized w/ Cognito.
+      EndpointConfiguration: 
+        Types: 
+          - REGIONAL
+      Name: ApiCognito
+
+  # Cognito authorizer for API gateway
+  # Identity Source - Forward user to UI -> User logs in -> callback URL has access token -> Provide token in payload / header 
+  #                                           - > API Gateway verifies token is correct
+  AuthorizerApiGateway:
+    Type: AWS::ApiGateway::Authorizer
+    Properties:
+      IdentitySource: method.request.header.authorization
+      Name: CognitoAuthorizer
+      ProviderARNs:
+        - !GetAtt UserPoolCognitoApi.Arn
+      RestApiId: !Ref ApiGatewayRest
+      Type: COGNITO_USER_POOLS
+
+  # Resource for the REST API Gateway.  Defines a path for a URL.  In this case, /health path is created for health checks.
+  ResourceApiGatewayHealth:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      ParentId: !GetAtt
+        - ApiGatewayRest
+        - RootResourceId
+      PathPart: health
+      RestApiId: !Ref ApiGatewayRest
+
+  # Method - GET.  Adds the GET method options to the /health resource path.  Integrated with the CRUD Lambda function.
+  MethodApiGatewayHealth:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      AuthorizationType: NONE
+      HttpMethod: GET
+      Integration:  
+        IntegrationHttpMethod: POST
+        Type: AWS_PROXY
+        Credentials: !GetAtt RoleApiGateway.Arn
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LambdaDummy.Arn}/invocations'
+      ResourceId: !Ref ResourceApiGatewayHealth
+      RestApiId: !Ref ApiGatewayRest
+
+  # Deploys the REST API to a stage so that clients can call the API over the internet.  The stage acts as an environment.
+  ApiGatewayDeployment:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn: MethodApiGatewayHealth
+    Properties:
+      Description: Lambda API Deployment
+      RestApiId: !Ref ApiGatewayRest
+
+  # Creates the Stage that the API gateway gets deployed to, this stage is 'dev'.
+  ApiGatewayStage:
+    Type: AWS::ApiGateway::Stage
+    Properties:
+      DeploymentId: !Ref ApiGatewayDeployment
+      Description: Lambda API Stage v0
+      RestApiId: !Ref ApiGatewayRest
+      StageName: 'dev'
+
+  # Cognito User Pool used as authorizer for API gateway
+  UserPoolCognitoApi:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: ApiUserPool
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 8
+      AutoVerifiedAttributes:
+        - email
+      UsernameAttributes:
+        - email
+      Schema:
+        - AttributeDataType: String
+          Name: email
+          Required: true
+
+  UserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      UserPoolId: !Ref UserPoolCognitoApi
+      ClientName: ApiUserPoolClient
+      GenerateSecret: false # set to false for web clients
+      PreventUserExistenceErrors: ENABLED
+      ExplicitAuthFlows:
+        - ALLOW_ADMIN_USER_PASSWORD_AUTH
+        - ALLOW_CUSTOM_AUTH
+        - ALLOW_USER_SRP_AUTH
+        - ALLOW_REFRESH_TOKEN_AUTH
+      SupportedIdentityProviders:
+        - COGNITO
+      CallbackURLs: 
+        - https://example.com/callback
+      LogoutURLs: 
+        - https://example.com/signout
+      AllowedOAuthFlowsUserPoolClient: true
+      AllowedOAuthFlows:
+        - code
+        - implicit
+      AllowedOAuthScopes:
+        - phone
+        - email
+        - openid
+        - profile
+        - aws.cognito.signin.user.admin
+
+  UserPoolDomainApi:
+    Type: AWS::Cognito::UserPoolDomain
+    Properties:
+      Domain: exampledomainforapi
+      UserPoolId: !Ref UserPoolCognitoApi
+
+  # # # DynamoDB table for product inventory.  This partition key is productId.
+  # # DynamoTableProducts:
+  # #   Type: AWS::DynamoDB::Table
+  # #   Properties: 
+  # #     AttributeDefinitions:
+  # #       - AttributeName: productId
+  # #         AttributeType: 'S'
+  # #     BillingMode: PAY_PER_REQUEST
+  # #     KeySchema:
+  # #       - AttributeName: productId
+  # #         KeyType: HASH
+  # #     TableName: product-inventory
+
+  # # # Role that gives API gateway access to all operations for the CRUD Lambda.
+  # RoleApiGateway:
+  #   Type: AWS::IAM::Role
+  #   Properties:
+  #     AssumeRolePolicyDocument:
+  #       Version: '2012-10-17'
+  #       Statement:
+  #         - Effect: 'Allow'
+  #           Principal:
+  #             Service: [apigateway.amazonaws.com]
+  #           Action:
+  #             - 'sts:AssumeRole'
+  #     Path: '/'
+  #     Policies:
+  #       - PolicyName: LambdaAccess
+  #         PolicyDocument:
+  #           Version: '2012-10-17'
+  #           Statement:
+  #             - Effect: 'Allow'
+  #               Action: 'lambda:*'
+  #               Resource: !GetAtt LambdaDummy.Arn
+  #     RoleName: ApiGatewayLambdaExecutionRole
+
+  # # # Role for Lambda to allow it to publish logs during execution and perform operations on the dynamo table.
+  # LambdaRole:
+  #   Type: 'AWS::IAM::Role'
+  #   Properties:
+  #     AssumeRolePolicyDocument:
+  #       Version: "2012-10-17"
+  #       Statement:
+  #         - Effect: Allow
+  #           Principal:
+  #             Service: [lambda.amazonaws.com]
+  #           Action:
+  #             - 'sts:AssumeRole'
+  #     Path: /
+  #     Policies:
+  #       - PolicyName: LambdaPermissions
+  #         PolicyDocument:
+  #           Version: '2012-10-17'
+  #           Statement:
+  #             - Effect: Allow
+  #               Action:
+  #                 - dynamodb:*
+  #                 - logs:*
+  #               Resource: '*' 
+  #     RoleName: LambdaRole 
+    
+  # # # Lambda function (Dummy) that returns a 200 response with the event body when triggered.
+  # LambdaDummy:
+  #   Type: AWS::Lambda::Function
+  #   Properties:
+  #     Description: Lambda function integrated w/ API for CRUD operations.
+  #     FunctionName: DummyLambda
+  #     Handler: index.handler
+  #     Role: !GetAtt LambdaRole.Arn
+  #     Runtime: nodejs12.x
+  #     Code:         
+  #       ZipFile:  |
+  #         exports.handler = async (event) => {
+  #           console.log('Loading function');
+  #           const response = {
+  #             statusCode: 200,
+  #             body: JSON.stringify("Event body:", event.body)
+  #           }
+  #           return response;
+  #         }
+
+  # # # Lambda permission that grants API Gateway the ability to invoke the function at a specific path.        
+  # PermissionLambdaRandom:
+  #   Type: AWS::Lambda::Permission
+  #   Properties:
+  #     Action: lambda:invokeFunction
+  #     FunctionName: !Ref LambdaDummy
+  #     Principal: apigateway.amazonaws.com
+  #     SourceArn:
+  #       Fn::Join:
+  #       - ''
+  #       - - 'arn:aws:execute-api:'
+  #         - Ref: AWS::Region
+  #         - ":"
+  #         - Ref: AWS::AccountId
+  #         - ":"
+  #         - Ref: ApiGatewayRest
+  #         - "/*/GET/dummy"
