@@ -20,9 +20,8 @@ Example showing API Gateway locked down through Cognito User Pools.  Only regist
 ### /health
 Health check path to confirm function of the API.
 
-&nbsp;
-
 **METHOD - GET**
+
 Returns 200 HTTP reponse code, along with a message body.
 
 Response example:
@@ -55,6 +54,8 @@ Users can navigate to the created Cognito UI domain, create an account associate
 
 API calls must utilize the 'authorization' header created as the API Gateway Authorizer Identity Source.  See the API Gateway Authorizer resource in this template for more details.
 
+&nbsp;
+&nbsp;
 #### Helpful Resources
 Video guide in the AWS console similar to this template's contents can be found [here](https://www.youtube.com/watch?v=oFSU6rhFETk).
 
