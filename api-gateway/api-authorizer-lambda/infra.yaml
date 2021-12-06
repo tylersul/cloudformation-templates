@@ -30,39 +30,61 @@ Resources:
   MethodApiGatewayHealth:
     Type: AWS::ApiGateway::Method
     Properties:
-      AuthorizerId: !Ref AuthorizerApiGateway
-      AuthorizationScopes:
-        - email
-      AuthorizationType: COGNITO_USER_POOLS
+      AuthorizationType: NONE
       HttpMethod: GET
       Integration:  
         IntegrationHttpMethod: POST
         Type: AWS_PROXY
-        Credentials: !GetAtt RoleApiGateway.Arn
+        Credentials: !GetAtt RoleLambdaExecution.Arn
         Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LambdaDummy.Arn}/invocations'
       ResourceId: !Ref ResourceApiGatewayHealth
+      RestApiId: !Ref ApiGatewayRest
+
+  # Resource for the REST API Gateway.  Defines a path for a URL.  In this case, /health path is created for health checks.
+  ResourceApiGatewayAuth:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      ParentId: !GetAtt
+        - ApiGatewayRest
+        - RootResourceId
+      PathPart: auth
+      RestApiId: !Ref ApiGatewayRest
+
+  # Method - GET.  Adds the GET method options to the /health resource path.  Integrated with the CRUD Lambda function.
+  MethodApiGatewayAuth:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      AuthorizerId: !Ref AuthorizerApiGateway
+      AuthorizationType: CUSTOM
+      HttpMethod: GET
+      Integration:  
+        IntegrationHttpMethod: POST
+        Type: AWS_PROXY
+        Credentials: !GetAtt RoleLambdaExecution.Arn
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LambdaAuthorizer.Arn}/invocations'
+      ResourceId: !Ref ResourceApiGatewayAuth
       RestApiId: !Ref ApiGatewayRest
 
   # Lambda authorizer for API Gateway
   AuthorizerApiGateway:
     Type: AWS::ApiGateway::Authorizer
     Properties:
-      AuthorizerCredentials: !GetAtt LambdaExecutionRole.Arn
-      AuthorizerUri:
-        - ''
-        - - 'arn:aws:apigateway:'
-          - !Ref 'AWS::Region'
-          - ':lambda:path/2015-03-31/functions/'
-          - !GetAtt 
-            - LambdaAuthorizer
-            - Arn
-          - /invocations
+      AuthorizerCredentials: !GetAtt RoleLambdaExecution.Arn
+      AuthorizerUri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LambdaAuthorizer.Arn}/invocations"
       IdentitySource: method.request.header.authorization
       Name: LambdaAuthorizer
       ProviderARNs:
         - !GetAtt UserPoolCognitoApi.Arn
       RestApiId: !Ref ApiGatewayRest
       Type: TOKEN
+
+  # PermissionsApiAuthorizer:
+  #   Type: "AWS::Lambda::Permission"
+  #   Properties:
+  #     Action: lambda:InvokeFunction
+  #     FunctionName: !GetAtt LambdaAuthorizer.Arn
+  #     Principal: "apigateway.amazonaws.com"
+  #     SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGatewayRestApi}/authorizers/${AuthorizerApiGateway}"
 
   # Deploys the REST API to a stage so that clients can call the API over the internet.  The stage acts as an environment.
   ApiGatewayDeployment:
@@ -150,13 +172,20 @@ Resources:
               - 'sts:AssumeRole'
       Path: '/'
       Policies:
-        - PolicyName: LambdaAccess
+        - PolicyName: LambdaDummyAccess
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
               - Effect: 'Allow'
                 Action: 'lambda:*'
                 Resource: !GetAtt LambdaDummy.Arn
+        - PolicyName: LambdaAuthAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: 'Allow'
+                Action: 'lambda:*'
+                Resource: !GetAtt LambdaAuthorizer.Arn
         - PolicyName: LogsPermissions
           PolicyDocument:
             Version: '2012-10-17'
@@ -206,7 +235,7 @@ Resources:
             console.log('Loading function');
             const response = {
               statusCode: 200,
-              body: JSON.stringify("This signals a successful API call with a Lambda authorizer token.")
+              body: JSON.stringify("This signals a successful API call without a Lambda authorizer token.")
             }
             return response;
           }
@@ -224,19 +253,23 @@ Resources:
           exports.handler = async (event) => {
             console.log('Loading function....');
             console.log('Event:', event);
+            let auth;
             if (event.authorization === 'abc123') {
               auth = 'allow';
             } else {
-              allow = 'deny';
+              auth = 'deny';
             }
+
+            const authResponse = { "principalId": "abc123", "policyDocument": { "Version": "2012-10-17", "Statement": [{"Action": "execute-api:Invoke", "Resource": "arn:aws:execute-api:${AWS::Region}:${AWS::Account}:*/*/*", "Effect": auth}]}}
             const response = {
               statusCode: 200,
               body: JSON.stringify("This signals a successful API call with a Lambda authorizer token.")
             }
-            return response;
+            return authResponse;
           }
 
-  # Lambda permission that grants API Gateway the ability to invoke the function at a specific path.        
+
+  # Lambda permission that grants API Gateway the ability to invoke the function at a specific path.  Allows GET requests for all paths.      
   PermissionLambdaRandom:
     Type: AWS::Lambda::Permission
     Properties:
